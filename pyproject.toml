@@ -9,23 +9,27 @@ authors = [
 requires-python = ">=3.9"
 dependencies = [
     "click>=8.0.0",
+    "huggingface-hub>=0.34.4",
     "pyyaml>=6.0",
     "toml>=0.10.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "black>=23.0.0",
-    "flake8>=6.0.0",
-    "pytest>=7.0.0",
+    "black>=25.1.0",
+    "flake8>=7.3.0",
+    "pytest>=8.4.2",
 ]
 
 [project.scripts]
 build-helper = "scripts.build:main"
 
 [build-system]
-requires = ["uv_build>=0.8.13,<0.9.0"]
-build-backend = "uv_build"
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = []
 
 [tool.black]
 line-length = 88
