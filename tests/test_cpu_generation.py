@@ -11,13 +11,12 @@ import torch
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(os.path.dirname(current_dir))
-pyo3_path = os.path.join(project_root, "scripts")
-sys.path.insert(0, pyo3_path)
+project_root = os.path.dirname(current_dir)
+sys.path.insert(0, project_root)
 
-from pyo3.gpt_oss.model import Transformer, ModelConfig
-from pyo3.gpt_oss.weights import Checkpoint
-from pyo3.gpt_oss.tokenizer import get_tokenizer
+from src.boilerplate.gpt_oss.model import Transformer, ModelConfig
+from src.boilerplate.gpt_oss.weights import Checkpoint
+from src.boilerplate.gpt_oss.tokenizer import get_tokenizer
 
 # Use relative path to model
 MODEL_PATH = os.path.join(project_root, "data", "models", "gpt-oss-20b", "original")
