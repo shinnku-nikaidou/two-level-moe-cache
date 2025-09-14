@@ -124,7 +124,7 @@ class LazyTransformer(torch.nn.Module):
 
     @staticmethod
     def from_checkpoint(
-        path: str, device: str | torch.device = "cuda"
+        path: str, device: str | torch.device = "cpu"  # 改为CPU默认
     ) -> "LazyTransformer":
         """
         Load transformer from checkpoint with lazy loading.
@@ -139,8 +139,9 @@ class LazyTransformer(torch.nn.Module):
         if not isinstance(device, torch.device):
             device = torch.device(device)
 
-        # Load configuration
-        config_path = os.path.join(path, "config.json")
+        # Load configuration from original subdirectory
+        original_path = os.path.join(path, "original")
+        config_path = os.path.join(original_path, "config.json")
         with open(config_path, "r") as f:
             json_config = json.load(f)
 
@@ -179,20 +180,18 @@ class LazyTransformer(torch.nn.Module):
                 ),
             )
 
-        # Create lazy transformer (point to original subfolder)
-        original_path = os.path.join(path, "original")
+        # Create lazy transformer 
         model = LazyTransformer(config=model_config, checkpoint_path=original_path)
         model.eval()
 
-        # Load non-expert weights normally
-        checkpoint = Checkpoint(original_path, device)
+        # Load non-expert weights normally - use correct device
+        checkpoint = Checkpoint(original_path, device)  # 使用目标device
 
         my_rank = dist.get_rank() if dist.is_initialized() else 0
         world_size = dist.get_world_size() if dist.is_initialized() else 1
 
         for name, param in model.named_parameters():
             # Skip MLP expert weights (they'll be loaded lazily)
-            # But keep gate weights and other components
             if (
                 "mlp.mlp1_weight" in name
                 or "mlp.mlp1_bias" in name
@@ -201,41 +200,39 @@ class LazyTransformer(torch.nn.Module):
             ):
                 continue
 
-            # Skip mlp.norm if it doesn't exist in checkpoint
-            if "mlp.norm" in name:
-                continue
-
             # Load other parameters normally
             try:
                 loaded_tensor = checkpoint.get(name)
 
-                # Apply world_size sharding if needed
-                per_rank_intermediate_size = (
-                    model_config.intermediate_size // world_size
-                )
-                if "mlp1" in name:  # Non-expert MLP1 parameters (if any)
-                    loaded_tensor = loaded_tensor[
-                        :,
-                        my_rank
-                        * 2
-                        * per_rank_intermediate_size : (my_rank + 1)
-                        * 2
-                        * per_rank_intermediate_size,
-                        ...,
-                    ]
-                elif "mlp2_weight" in name:  # Non-expert MLP2 weights (if any)
-                    loaded_tensor = loaded_tensor[
-                        ...,
-                        my_rank
-                        * per_rank_intermediate_size : (my_rank + 1)
-                        * per_rank_intermediate_size,
-                    ]
+                # Apply world_size sharding if needed (but not for single node CPU)
+                if world_size > 1:
+                    per_rank_intermediate_size = (
+                        model_config.intermediate_size // world_size
+                    )
+                    if "mlp1" in name:  # Non-expert MLP1 parameters (if any)
+                        loaded_tensor = loaded_tensor[
+                            :,
+                            my_rank
+                            * 2
+                            * per_rank_intermediate_size : (my_rank + 1)
+                            * 2
+                            * per_rank_intermediate_size,
+                            ...,
+                        ]
+                    elif "mlp2_weight" in name:  # Non-expert MLP2 weights (if any)
+                        loaded_tensor = loaded_tensor[
+                            ...,
+                            my_rank
+                            * per_rank_intermediate_size : (my_rank + 1)
+                            * per_rank_intermediate_size,
+                        ]
 
                 param.data.copy_(loaded_tensor)
 
             except Exception as e:
-                # Skip missing parameters (likely expert weights)
-                print(f"Skipping parameter {name}: {e}")
+                # Skip missing parameters - don't print for expected skips
+                if "No CUDA GPUs are available" not in str(e):
+                    print(f"Skipping parameter {name}: {e}")
 
         return model
 
