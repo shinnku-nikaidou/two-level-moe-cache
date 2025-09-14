@@ -130,10 +130,10 @@ class LazyMLPBlock(torch.nn.Module):
         assert self.device is not None, "Device must be set before initializing lazy tensors"
         
         # Use actual parameter names from the original checkpoint
-        # MLP1 (gate_up) tensors
+        # Checkpoint class automatically handles MXFP4 conversion, so use base names
         self.mlp1_weight = LazyExpertTensor(
             checkpoint_path=self.checkpoint_path,
-            param_name=f"block.{self.layer_idx}.mlp.mlp1_weight.blocks",
+            param_name=f"block.{self.layer_idx}.mlp.mlp1_weight",
             expected_shape=(self.num_experts, intermediate_size * 2, self.config.hidden_size),
             dtype=torch.bfloat16,
             device=self.device
@@ -150,7 +150,7 @@ class LazyMLPBlock(torch.nn.Module):
         # MLP2 (down) tensors  
         self.mlp2_weight = LazyExpertTensor(
             checkpoint_path=self.checkpoint_path,
-            param_name=f"block.{self.layer_idx}.mlp.mlp2_weight.blocks",
+            param_name=f"block.{self.layer_idx}.mlp.mlp2_weight",
             expected_shape=(self.num_experts, self.config.hidden_size, intermediate_size),
             dtype=torch.bfloat16,
             device=self.device
