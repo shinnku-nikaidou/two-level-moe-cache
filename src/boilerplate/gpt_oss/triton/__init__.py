@@ -9,30 +9,28 @@ This module contains high-performance implementations of:
 from .attention import attention, attention_ref
 from .moe import quantize_mx4, moe, swiglu
 from .model import (
-    RotaryEmbedding, 
-    Cache, 
-    AttentionBlock, 
-    MLPBlock, 
-    TransformerBlock, 
-    Transformer, 
-    TokenGenerator
+    RotaryEmbedding,
+    Cache,
+    AttentionBlock,
+    MLPBlock,
+    TransformerBlock,
+    Transformer,
+    TokenGenerator,
 )
 
 __all__ = [
     # Attention
     "attention",
     "attention_ref",
-    
     # MoE
     "quantize_mx4",
-    "moe", 
+    "moe",
     "swiglu",
-    
     # Model components
     "RotaryEmbedding",
     "Cache",
     "AttentionBlock",
-    "MLPBlock", 
+    "MLPBlock",
     "TransformerBlock",
     "Transformer",
     "TokenGenerator",

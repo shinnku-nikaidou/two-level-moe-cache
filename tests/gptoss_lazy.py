@@ -53,10 +53,12 @@ class LazyTokenGenerator:
                 tokens[-context_length:] if len(tokens) > context_length else tokens
             )
 
-            # Process one token at a time (2D input as expected by boilerplate)
+            # Use full context like the working gptoss_cpu_boil.py
             logits = self.model(
-                torch.as_tensor(input_tokens[-1:], dtype=torch.int32, device=self.device)
-            )[0]  # Take first (and only) token's logits
+                torch.as_tensor(input_tokens, dtype=torch.int32, device=self.device)
+            )[
+                -1
+            ]  # Take logits for the last position
 
             if temperature == 0.0:
                 predicted_token = torch.argmax(logits, dim=-1).item()
@@ -97,7 +99,7 @@ def test_basic_functionality():
     prompt = "Hello"
     tokens = tokenizer.encode(prompt)
     test_input = torch.as_tensor(tokens, dtype=torch.int32, device=device)
-    
+
     print(f"\nTesting forward pass:")
     print(f"Input: '{prompt}' -> tokens: {tokens}")
     print(f"Input tensor: {test_input.shape}, dtype: {test_input.dtype}")
@@ -105,26 +107,27 @@ def test_basic_functionality():
     try:
         with torch.no_grad():
             output = model(test_input)
-        
+
         print(f"✅ Forward pass successful!")
         print(f"Output shape: {output.shape}, dtype: {output.dtype}")
-        
+
         # Get top predictions
         logits = output[0]  # First (and only) token's logits
         top_5_probs, top_5_indices = torch.topk(torch.softmax(logits, dim=-1), 5)
-        
+
         print(f"\nTop 5 predictions:")
         for i in range(5):
             token_id = top_5_indices[i].item()
             prob = top_5_probs[i].item()
             token_text = tokenizer.decode([token_id])
             print(f"  {i+1}. {repr(token_text)} (prob: {prob:.4f})")
-            
+
         return True
-        
+
     except Exception as e:
         print(f"❌ Forward pass failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -145,12 +148,7 @@ def test_lazy_generation():
     tokenizer = get_tokenizer()
 
     # Test simple prompts
-    prompts = [
-        "Hello",
-        "The capital of France is",
-        "114514, ",
-        "rust lang"
-    ]
+    prompts = ["Hello", "The capital of France is", "114514, ", "rust lang"]
 
     for prompt in prompts:
         print(f"\nInput: '{prompt}'")
@@ -189,6 +187,7 @@ def test_lazy_generation():
         except Exception as e:
             print(f"Generation failed: {e}")
             import traceback
+
             traceback.print_exc()
 
         print("-" * 40)
@@ -198,23 +197,23 @@ def test_memory_efficiency():
     """Test that LazyTransformer uses less memory than loading all experts"""
     print("\nMemory Efficiency Test")
     print("=" * 60)
-    
+
     device = torch.device("cpu")
-    
+
     # Load LazyTransformer
     model = LazyTransformer.from_checkpoint(MODEL_PATH)
-    
+
     # Get memory usage info
     print("Memory usage comparison:")
     print("- LazyTransformer: Only loads 4 experts per forward pass")
     print("- Original Transformer: Loads all 32 experts at initialization")
     print("- Memory saving: ~87.5% reduction in expert weight memory")
-    
+
     # Test that model works
     tokenizer = get_tokenizer()
     tokens = tokenizer.encode("Test")
     test_input = torch.as_tensor(tokens, dtype=torch.int32, device=device)
-    
+
     with torch.no_grad():
         output = model(test_input)
         print(f"✅ Forward pass successful, output shape: {output.shape}")
@@ -230,11 +229,12 @@ if __name__ == "__main__":
             print("\n" + "=" * 60)
             # Then test generation if basic test passes
             test_lazy_generation()
-        
+
         test_memory_efficiency()
         print("\n🎉 All tests completed successfully!")
         print("LazyTransformer with on-demand expert loading is working!")
     except Exception as e:
         print(f"\nTest failed: {e}")
         import traceback
+
         traceback.print_exc()

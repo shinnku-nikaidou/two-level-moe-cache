@@ -12,11 +12,11 @@ from .model import LazyTransformer, LazyTransformerBlock, LazyTokenGenerator
 # Re-export essential boilerplate components
 from ...boilerplate.gpt_oss.model import (
     ModelConfig,
-    RMSNorm, 
+    RMSNorm,
     AttentionBlock,
     TransformerBlock,
     TokenGenerator,
-    swiglu
+    swiglu,
 )
 
 # Re-export utilities
@@ -26,16 +26,15 @@ __all__ = [
     # Domain-specific implementations
     "LazyMLPBlock",
     "LazyExpertTensor",
-    "LazyTransformer", 
+    "LazyTransformer",
     "LazyTransformerBlock",
     "LazyTokenGenerator",
-    
     # Re-exported boilerplate components
     "ModelConfig",
     "RMSNorm",
-    "AttentionBlock", 
+    "AttentionBlock",
     "TransformerBlock",
     "TokenGenerator",
     "swiglu",
-    "Checkpoint"
+    "Checkpoint",
 ]

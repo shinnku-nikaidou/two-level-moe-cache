@@ -1252,6 +1252,7 @@ source = { editable = "." }
 dependencies = [
     { name = "accelerate" },
     { name = "aiohttp" },
+    { name = "black" },
     { name = "click" },
     { name = "huggingface-hub" },
     { name = "kernels" },
@@ -1279,6 +1280,7 @@ dev = [
 requires-dist = [
     { name = "accelerate", specifier = ">=1.10.1" },
     { name = "aiohttp", specifier = ">=3.12.15" },
+    { name = "black", specifier = ">=25.1.0" },
     { name = "black", marker = "extra == 'dev'", specifier = ">=25.1.0" },
     { name = "click", specifier = ">=8.0.0" },
     { name = "flake8", marker = "extra == 'dev'", specifier = ">=7.3.0" },

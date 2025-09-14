@@ -180,7 +180,7 @@ class LazyTransformer(torch.nn.Module):
                 ),
             )
 
-        # Create lazy transformer 
+        # Create lazy transformer
         model = LazyTransformer(config=model_config, checkpoint_path=original_path)
         model.eval()
 
