@@ -11,8 +11,6 @@ import torch
 import torch.distributed as dist
 
 from ...boilerplate.gpt_oss.model import (
-    Transformer as BaseTransformer,
-    TransformerBlock as BaseTransformerBlock,
     ModelConfig,
     AttentionBlock,
     RMSNorm,
@@ -25,8 +23,8 @@ class LazyTransformerBlock(torch.nn.Module):
     """
     Transformer block using LazyMLPBlock for memory-efficient expert loading.
 
-    Replaces the standard MLP block with a lazy-loading version that only
-    loads expert weights when needed.
+    Always uses lazy loading for MoE expert weights, automatically detects
+    device from input tensors.
     """
 
     def __init__(
@@ -34,7 +32,6 @@ class LazyTransformerBlock(torch.nn.Module):
         config: ModelConfig,
         layer_idx: int,
         checkpoint_path: str,
-        device: torch.device | None = None,
     ):
         """
         Initialize lazy transformer block.
@@ -43,16 +40,16 @@ class LazyTransformerBlock(torch.nn.Module):
             config: Model configuration
             layer_idx: Layer index
             checkpoint_path: Path to checkpoint directory
-            device: Target device for computations
         """
         super().__init__()
         self.layer_idx = layer_idx
+        self.checkpoint_path = checkpoint_path
 
-        # Use regular attention block (no memory optimization needed)
-        self.attn = AttentionBlock(config, layer_idx, device)
+        # Use regular attention block (device will be set during forward)
+        self.attn = AttentionBlock(config, layer_idx, device=None)
 
-        # Use lazy MLP block for memory efficiency
-        self.mlp = LazyMLPBlock(config, checkpoint_path, layer_idx, device)
+        # Use lazy MLP block for memory efficiency (device will be set during forward)
+        self.mlp = LazyMLPBlock(config, checkpoint_path, layer_idx, device=None)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through attention and lazy MLP blocks."""
@@ -73,7 +70,6 @@ class LazyTransformer(torch.nn.Module):
         self,
         config: ModelConfig,
         checkpoint_path: str | None = None,
-        device: torch.device | None = None,
     ):
         """
         Initialize lazy transformer.
@@ -81,46 +77,44 @@ class LazyTransformer(torch.nn.Module):
         Args:
             config: Model configuration
             checkpoint_path: Path to checkpoint directory (required for lazy loading)
-            device: Target device for computations
         """
         super().__init__()
         self.config = config
         self.checkpoint_path = checkpoint_path
-        self.device = device or torch.device("cuda")
 
-        # Standard components (no lazy loading needed)
+        # Standard components (device will be auto-detected)
         self.embedding = torch.nn.Embedding(
-            config.vocab_size, config.hidden_size, device=device, dtype=torch.bfloat16
+            config.vocab_size, config.hidden_size, dtype=torch.bfloat16
         )
 
-        # Lazy transformer blocks
+        # Always use lazy transformer blocks
         if checkpoint_path:
             self.block = torch.nn.ModuleList(
                 [
-                    LazyTransformerBlock(config, layer_idx, checkpoint_path, device)
+                    LazyTransformerBlock(config, layer_idx, checkpoint_path)
                     for layer_idx in range(config.num_hidden_layers)
                 ]
             )
         else:
-            # Fallback to regular blocks if no checkpoint path provided
-            self.block = torch.nn.ModuleList(
-                [
-                    BaseTransformerBlock(config, layer_idx, device)
-                    for layer_idx in range(config.num_hidden_layers)
-                ]
-            )
+            raise ValueError("checkpoint_path is required for LazyTransformer")
 
-        self.norm = RMSNorm(config.hidden_size, device=device)
+        self.norm = RMSNorm(config.hidden_size, device=None)
         self.unembedding = torch.nn.Linear(
             config.hidden_size,
             config.vocab_size,
             bias=False,
-            device=device,
             dtype=torch.bfloat16,
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through the lazy transformer."""
+        # Auto-detect device from input and move components if needed
+        device = x.device
+        if self.embedding.weight.device != device:
+            self.embedding = self.embedding.to(device)
+            self.norm = self.norm.to(device)
+            self.unembedding = self.unembedding.to(device)
+
         x = self.embedding(x)
         for block in self.block:
             x = block(x)
@@ -130,18 +124,17 @@ class LazyTransformer(torch.nn.Module):
 
     @staticmethod
     def from_checkpoint(
-        path: str, device: str | torch.device = "cuda", lazy_loading: bool = True
-    ) -> "LazyTransformer | BaseTransformer":
+        path: str, device: str | torch.device = "cuda"
+    ) -> "LazyTransformer":
         """
-        Load transformer from checkpoint with optional lazy loading.
+        Load transformer from checkpoint with lazy loading.
 
         Args:
             path: Path to checkpoint directory
             device: Target device
-            lazy_loading: Whether to use lazy loading for expert weights
 
         Returns:
-            LazyTransformer if lazy_loading=True, otherwise BaseTransformer
+            LazyTransformer with lazy loading enabled
         """
         if not isinstance(device, torch.device):
             device = torch.device(device)
@@ -186,14 +179,8 @@ class LazyTransformer(torch.nn.Module):
                 ),
             )
 
-        if not lazy_loading:
-            # Use original implementation
-            return BaseTransformer.from_checkpoint(path, device)
-
         # Create lazy transformer
-        model = LazyTransformer(
-            config=model_config, checkpoint_path=path, device=device
-        )
+        model = LazyTransformer(config=model_config, checkpoint_path=path)
         model.eval()
 
         # Load non-expert weights normally
@@ -262,9 +249,9 @@ class LazyTokenGenerator:
             device: Target device for inference
         """
         self.device = device
-        self.model = LazyTransformer.from_checkpoint(
-            checkpoint, device=device, lazy_loading=True
-        )
+        self.model = LazyTransformer.from_checkpoint(checkpoint, device=device)
+        # Move model to device after creation
+        self.model = self.model.to(device)
 
     @torch.inference_mode()
     def generate(
@@ -297,10 +284,10 @@ class LazyTokenGenerator:
             )[-1]
 
             if temperature == 0.0:
-                predicted_token = torch.argmax(logits, dim=-1).item()
+                predicted_token = int(torch.argmax(logits, dim=-1).item())
             else:
                 probs = torch.softmax(logits * (1.0 / temperature), dim=-1)
-                predicted_token = torch.multinomial(probs, num_samples=1).item()
+                predicted_token = int(torch.multinomial(probs, num_samples=1).item())
 
             tokens.append(predicted_token)
             num_generated_tokens += 1

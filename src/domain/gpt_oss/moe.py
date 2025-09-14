@@ -89,8 +89,7 @@ class LazyExpertTensor:
             full_tensor = f.get_tensor(self.param_name)
             
             # Slice only the required experts
-            # expert_indices shape: (batch_size, experts_per_token)
-            # Result shape: (batch_size, experts_per_token, ...)
+            # expert_indices should already be on CPU
             selected_tensor = full_tensor[expert_indices, ...]
             
             # Move to target device and convert dtype
@@ -117,13 +116,13 @@ class LazyMLPBlock(torch.nn.Module):
             config: Model configuration
             checkpoint_path: Path to checkpoint directory
             layer_idx: Layer index for parameter naming
-            device: Target device for computations
+            device: Target device for computations (None for auto-detection)
         """
         super().__init__()
         self.config = config
         self.checkpoint_path = checkpoint_path
         self.layer_idx = layer_idx
-        self.device = device or torch.device('cuda')
+        self.device = device  # Will be set on first forward pass if None
         
         # MoE configuration
         self.num_experts = config.num_experts
@@ -131,19 +130,34 @@ class LazyMLPBlock(torch.nn.Module):
         self.swiglu_limit = config.swiglu_limit
         self.world_size = dist.get_world_size() if dist.is_initialized() else 1
         
-        # Non-expert components (loaded normally)
+        # Non-expert components (device will be set during forward if needed)
         self.norm = RMSNorm(config.hidden_size, device=device)
         self.gate = torch.nn.Linear(
             config.hidden_size, config.num_experts, 
-            device=device, dtype=torch.bfloat16
+            device=device, dtype=torch.bfloat16, bias=False
         )
         
-        # Lazy expert tensors (not loaded until needed)
-        intermediate_size = config.intermediate_size // self.world_size
-        self._init_lazy_expert_tensors(intermediate_size)
+        # Lazy expert tensors will be initialized on first forward pass
+        self._lazy_tensors_initialized = False
+    
+    def _ensure_device_and_tensors(self, input_device: torch.device):
+        """Ensure device is set and lazy tensors are initialized."""
+        if self.device is None:
+            self.device = input_device
+            # Move components to detected device
+            self.norm = self.norm.to(input_device)
+            self.gate = self.gate.to(input_device)
+        
+        if not self._lazy_tensors_initialized:
+            intermediate_size = self.config.intermediate_size // self.world_size
+            self._init_lazy_expert_tensors(intermediate_size)
+            self._lazy_tensors_initialized = True
     
     def _init_lazy_expert_tensors(self, intermediate_size: int):
         """Initialize lazy loading tensors for expert weights."""
+        # Ensure device is set
+        assert self.device is not None, "Device must be set before initializing lazy tensors"
+        
         # MLP1 (gate_up) tensors
         self.mlp1_weight = LazyExpertTensor(
             checkpoint_path=self.checkpoint_path,
@@ -194,6 +208,9 @@ class LazyMLPBlock(torch.nn.Module):
         Returns:
             Output tensor after MoE computation
         """
+        # Auto-detect device from input and initialize if needed
+        self._ensure_device_and_tensors(x.device)
+        
         # Normalize input
         t = self.norm(x)
         
@@ -204,17 +221,20 @@ class LazyMLPBlock(torch.nn.Module):
         expert_indices = experts.indices
         
         try:
+            # Move expert_indices to CPU for safetensor indexing
+            expert_indices_cpu = expert_indices.cpu()
+            
             # Load only the selected expert weights
-            mlp1_weight = self.mlp1_weight.load_experts(expert_indices)
-            mlp1_bias = self.mlp1_bias.load_experts(expert_indices)
+            mlp1_weight = self.mlp1_weight.load_experts(expert_indices_cpu)
+            mlp1_bias = self.mlp1_bias.load_experts(expert_indices_cpu)
             
             # MLP1 computation with SwiGLU activation
             t_mlp1 = torch.einsum("beck,bk->bec", mlp1_weight, t) + mlp1_bias
             t_activated = swiglu(t_mlp1, limit=self.swiglu_limit)
             
             # Load MLP2 weights
-            mlp2_weight = self.mlp2_weight.load_experts(expert_indices)  
-            mlp2_bias = self.mlp2_bias.load_experts(expert_indices)
+            mlp2_weight = self.mlp2_weight.load_experts(expert_indices_cpu)  
+            mlp2_bias = self.mlp2_bias.load_experts(expert_indices_cpu)
             
             # MLP2 computation
             t_mlp2 = torch.einsum("beck,bek->bec", mlp2_weight, t_activated)
@@ -246,7 +266,7 @@ class LazyMLPBlock(torch.nn.Module):
                 del t_mlp2 # pyright: ignore[reportPossiblyUnboundVariable]
             
             # Force GPU memory cleanup
-            if self.device.type == 'cuda':
+            if self.device and self.device.type == 'cuda':
                 torch.cuda.empty_cache()
         
         # Residual connection
