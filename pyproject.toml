@@ -10,6 +10,7 @@ dependencies = [
     "aiohttp>=3.12.15",
     "click>=8.0.0",
     "huggingface-hub>=0.34.4",
+    "kernels>=0.10.1",
     "openai-harmony>=0.0.4",
     "packaging>=25.0",
     "pydantic>=2.11.9",

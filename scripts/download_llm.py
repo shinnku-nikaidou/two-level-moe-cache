@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # Script to download GPT-OSS models from Hugging Face
-# usage: python scripts/download_gptoss.py
+# usage: python scripts/download_llm.py
 from huggingface_hub import snapshot_download
 import os
 
@@ -27,4 +27,17 @@ local_path = snapshot_download(
     local_dir=DEST,
     resume_download=True,
 )
+print(f"Downloaded to: {local_path}")
+
+
+REPO_ID = "microsoft/Phi-tiny-MoE-instruct"
+DEST = os.path.join(os.path.dirname(__file__), "..", "data", "models", "phi-tiny-moe")
+
+os.makedirs(DEST, exist_ok=True)
+local_path = snapshot_download(
+    repo_id=REPO_ID,
+    local_dir=DEST,
+    resume_download=True,
+)
+
 print(f"Downloaded to: {local_path}")

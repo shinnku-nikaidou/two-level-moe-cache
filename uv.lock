@@ -364,6 +364,20 @@ wheels = [
 ]
 
 [[package]]
+name = "kernels"
+version = "0.10.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "huggingface-hub" },
+    { name = "packaging" },
+    { name = "pyyaml" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/84/6d/4055e6860c43a8745569ec6b8f4d54c2f75d7ff008f0137c5145d7c34caa/kernels-0.10.1.tar.gz", hash = "sha256:2ebe81114e5d4178b06a9ea3c263421c7ceee0a99588a7407ff827653007b919", size = 43241, upload-time = "2025-09-10T07:43:19.018Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c7/c9/fbfb470016365a56897b9f0faf9d3170fe3ecb584d4eb8f19f03210a6f9f/kernels-0.10.1-py3-none-any.whl", hash = "sha256:6a8c7867deb548279b1b312a1c02cc568125b57babdad14c3a757cba1ad8bf85", size = 37669, upload-time = "2025-09-10T07:43:17.927Z" },
+]
+
+[[package]]
 name = "markupsafe"
 version = "3.0.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1240,6 +1254,7 @@ dependencies = [
     { name = "aiohttp" },
     { name = "click" },
     { name = "huggingface-hub" },
+    { name = "kernels" },
     { name = "openai-harmony" },
     { name = "packaging" },
     { name = "pydantic" },
@@ -1267,6 +1282,7 @@ requires-dist = [
     { name = "click", specifier = ">=8.0.0" },
     { name = "flake8", marker = "extra == 'dev'", specifier = ">=7.3.0" },
     { name = "huggingface-hub", specifier = ">=0.34.4" },
+    { name = "kernels", specifier = ">=0.10.1" },
     { name = "openai-harmony", specifier = ">=0.0.4" },
     { name = "packaging", specifier = ">=25.0" },
     { name = "pydantic", specifier = ">=2.11.9" },
