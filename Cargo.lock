@@ -3,5 +3,21 @@
 version = 4
 
 [[package]]
-name = "two-level-moe-cache"
+name = "backend"
+version = "0.1.0"
+
+[[package]]
+name = "cli"
+version = "0.1.0"
+
+[[package]]
+name = "core"
+version = "0.1.0"
+
+[[package]]
+name = "policy"
+version = "0.1.0"
+
+[[package]]
+name = "runtime"
 version = "0.1.0"

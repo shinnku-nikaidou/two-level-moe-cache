@@ -1,0 +1,10 @@
+[package]
+name = "cli"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "two-level-moe-cache-cli"
+path = "main.rs"
+
+[dependencies]

@@ -1,0 +1,10 @@
+[package]
+name = "backend"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+name = "backend"
+path = "lib.rs"
+
+[dependencies]

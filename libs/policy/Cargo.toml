@@ -1,0 +1,10 @@
+[package]
+name = "policy"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+name = "policy"
+path = "lib.rs"
+
+[dependencies]
