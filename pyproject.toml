@@ -8,10 +8,14 @@ authors = [
 ]
 requires-python = ">=3.9"
 dependencies = [
+    "aiohttp>=3.12.15",
     "click>=8.0.0",
     "huggingface-hub>=0.34.4",
+    "pydantic>=2.11.9",
     "pyyaml>=6.0",
+    "safetensors>=0.6.2",
     "toml>=0.10.0",
+    "torch>=2.8.0",
 ]
 
 [project.optional-dependencies]
