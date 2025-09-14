@@ -17,7 +17,9 @@ local_path = snapshot_download(
 )
 print(f"Downloaded to: {local_path}")
 
+
 REPO_ID = "openai/gpt-oss-120b"
+DEST = os.path.join(os.path.dirname(__file__), "..", "data", "models", "gpt-oss-120b")
 
 os.makedirs(DEST, exist_ok=True)
 local_path = snapshot_download(
