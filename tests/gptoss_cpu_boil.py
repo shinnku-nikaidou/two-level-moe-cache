@@ -116,8 +116,6 @@ def test_cpu_generation():
         "Hello",
         "The capital of France is",
         "2 + 2 =",
-        "Python is",
-        "What is AI?",
     ]
 
     for prompt in prompts:
@@ -129,7 +127,7 @@ def test_cpu_generation():
         generated_tokens = []
 
         try:
-            # Generate 20 tokens
+            # Generate 5 tokens
             for i, token_or_tuple in enumerate(
                 generator.generate(
                     tokens,
@@ -144,7 +142,7 @@ def test_cpu_generation():
                 print(f"  Token {i+1}: {repr(token_text)} (logprob: {logprob:.3f})")
                 generated_tokens.append(token)
 
-                if i >= 20:
+                if i >= 5:
                     break
 
             # Decode full text

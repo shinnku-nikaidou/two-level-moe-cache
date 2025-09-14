@@ -11,6 +11,7 @@ import torch.distributed as dist
 from safetensors import safe_open
 
 from ...boilerplate.gpt_oss.model import ModelConfig, swiglu, RMSNorm
+from ...boilerplate.gpt_oss.weights import Checkpoint
 
 
 class LazyExpertTensor:
@@ -29,7 +30,7 @@ class LazyExpertTensor:
         
         Args:
             checkpoint_path: Path to the checkpoint directory
-            param_name: Parameter name in safetensor files (e.g., "model.layers.0.mlp.experts.gate_up_proj_blocks")
+            param_name: Parameter name in checkpoint (e.g., "block.0.mlp.mlp1_weight")
             expected_shape: Expected full tensor shape (num_experts, ...)
             dtype: Target data type for loaded tensors
             device: Target device for loaded tensors
@@ -41,37 +42,12 @@ class LazyExpertTensor:
         self.device = device
         self.num_experts = expected_shape[0]
         
-        # Build mapping from tensor names to safetensor files
-        self._build_file_mapping()
-    
-    def _build_file_mapping(self):
-        """Build mapping from parameter names to safetensor file paths."""
-        self.tensor_to_file = {}
-        
-        # Read safetensor index to find which file contains our parameter
-        index_path = os.path.join(self.checkpoint_path, "model.safetensors.index.json")
-        if os.path.exists(index_path):
-            import json
-            with open(index_path, 'r') as f:
-                index = json.load(f)
-                weight_map = index.get('weight_map', {})
-                if self.param_name in weight_map:
-                    filename = weight_map[self.param_name]
-                    self.tensor_to_file[self.param_name] = os.path.join(self.checkpoint_path, filename)
-        
-        # Fallback: search all safetensor files
-        if self.param_name not in self.tensor_to_file:
-            for fname in os.listdir(self.checkpoint_path):
-                if fname.endswith('.safetensors'):
-                    filepath = os.path.join(self.checkpoint_path, fname)
-                    with safe_open(filepath, framework="pt", device="cpu") as f:
-                        if self.param_name in f.keys():
-                            self.tensor_to_file[self.param_name] = filepath
-                            break
+        # Use Checkpoint class for proper MXFP4 handling
+        self.checkpoint = Checkpoint(checkpoint_path, torch.device("cpu"))  # Load to CPU first
     
     def load_experts(self, expert_indices: torch.Tensor) -> torch.Tensor:
         """
-        Load specific experts from safetensor files.
+        Load specific experts from checkpoint using Checkpoint class.
         
         Args:
             expert_indices: Tensor of expert indices to load, shape (batch_size, experts_per_token)
@@ -79,20 +55,15 @@ class LazyExpertTensor:
         Returns:
             Selected expert weights, shape (batch_size, experts_per_token, ...)
         """
-        if self.param_name not in self.tensor_to_file:
-            raise FileNotFoundError(f"Parameter {self.param_name} not found in checkpoint files")
+        # Load full tensor from checkpoint (handles MXFP4 automatically)
+        full_tensor = self.checkpoint.get(self.param_name)
         
-        file_path = self.tensor_to_file[self.param_name]
+        # Slice only the required experts
+        # expert_indices should already be on CPU
+        selected_tensor = full_tensor[expert_indices, ...]
         
-        with safe_open(file_path, framework="pt", device="cpu") as f:
-            # Load full tensor to CPU first
-            full_tensor = f.get_tensor(self.param_name)
-            
-            # Slice only the required experts
-            # expert_indices should already be on CPU
-            selected_tensor = full_tensor[expert_indices, ...]
-            
-            # Move to target device and convert dtype
+        # Move to target device and convert dtype if needed
+        if selected_tensor.device != self.device or selected_tensor.dtype != self.dtype:
             selected_tensor = selected_tensor.to(device=self.device, dtype=self.dtype)
         
         return selected_tensor
@@ -158,10 +129,11 @@ class LazyMLPBlock(torch.nn.Module):
         # Ensure device is set
         assert self.device is not None, "Device must be set before initializing lazy tensors"
         
+        # Use actual parameter names from the original checkpoint
         # MLP1 (gate_up) tensors
         self.mlp1_weight = LazyExpertTensor(
             checkpoint_path=self.checkpoint_path,
-            param_name=f"model.layers.{self.layer_idx}.mlp.experts.gate_up_proj_blocks",
+            param_name=f"block.{self.layer_idx}.mlp.mlp1_weight.blocks",
             expected_shape=(self.num_experts, intermediate_size * 2, self.config.hidden_size),
             dtype=torch.bfloat16,
             device=self.device
@@ -169,7 +141,7 @@ class LazyMLPBlock(torch.nn.Module):
         
         self.mlp1_bias = LazyExpertTensor(
             checkpoint_path=self.checkpoint_path,
-            param_name=f"model.layers.{self.layer_idx}.mlp.experts.gate_up_proj_bias", 
+            param_name=f"block.{self.layer_idx}.mlp.mlp1_bias", 
             expected_shape=(self.num_experts, intermediate_size * 2),
             dtype=torch.bfloat16,
             device=self.device
@@ -178,7 +150,7 @@ class LazyMLPBlock(torch.nn.Module):
         # MLP2 (down) tensors  
         self.mlp2_weight = LazyExpertTensor(
             checkpoint_path=self.checkpoint_path,
-            param_name=f"model.layers.{self.layer_idx}.mlp.experts.down_proj_blocks",
+            param_name=f"block.{self.layer_idx}.mlp.mlp2_weight.blocks",
             expected_shape=(self.num_experts, self.config.hidden_size, intermediate_size),
             dtype=torch.bfloat16,
             device=self.device
@@ -186,7 +158,7 @@ class LazyMLPBlock(torch.nn.Module):
         
         self.mlp2_bias = LazyExpertTensor(
             checkpoint_path=self.checkpoint_path,
-            param_name=f"model.layers.{self.layer_idx}.mlp.experts.down_proj_bias",
+            param_name=f"block.{self.layer_idx}.mlp.mlp2_bias",
             expected_shape=(self.num_experts, self.config.hidden_size),
             dtype=torch.bfloat16,
             device=self.device

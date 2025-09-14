@@ -179,24 +179,30 @@ class LazyTransformer(torch.nn.Module):
                 ),
             )
 
-        # Create lazy transformer
-        model = LazyTransformer(config=model_config, checkpoint_path=path)
+        # Create lazy transformer (point to original subfolder)
+        original_path = os.path.join(path, "original")
+        model = LazyTransformer(config=model_config, checkpoint_path=original_path)
         model.eval()
 
         # Load non-expert weights normally
-        checkpoint = Checkpoint(path, device)
+        checkpoint = Checkpoint(original_path, device)
 
         my_rank = dist.get_rank() if dist.is_initialized() else 0
         world_size = dist.get_world_size() if dist.is_initialized() else 1
 
         for name, param in model.named_parameters():
             # Skip MLP expert weights (they'll be loaded lazily)
+            # But keep gate weights and other components
             if (
                 "mlp.mlp1_weight" in name
                 or "mlp.mlp1_bias" in name
                 or "mlp.mlp2_weight" in name
                 or "mlp.mlp2_bias" in name
             ):
+                continue
+
+            # Skip mlp.norm if it doesn't exist in checkpoint
+            if "mlp.norm" in name:
                 continue
 
             # Load other parameters normally
