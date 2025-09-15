@@ -62,12 +62,14 @@ class LazyTokenGenerator:
                 probs = torch.softmax(logits * (1.0 / temperature), dim=-1)
                 predicted_token = torch.multinomial(probs, num_samples=1).item()
 
-            tokens.append(predicted_token)
+            tokens.append(predicted_token)  # pyright: ignore[reportArgumentType]
             num_generated_tokens += 1
 
             if return_logprobs:
                 logprobs = torch.log_softmax(logits, dim=-1)
-                selected_logprobs = logprobs[predicted_token].item()
+                selected_logprobs = logprobs[
+                    predicted_token
+                ].item()  # pyright: ignore[reportArgumentType]
                 yield predicted_token, selected_logprobs
             else:
                 yield predicted_token
@@ -115,7 +117,9 @@ def test_basic_functionality():
         for i in range(5):
             token_id = top_5_indices[i].item()
             prob = top_5_probs[i].item()
-            token_text = tokenizer.decode([token_id])
+            token_text = tokenizer.decode(
+                [token_id]  # pyright: ignore[reportArgumentType]
+            )
             print(f"  {i+1}. {repr(token_text)} (prob: {prob:.4f})")
 
         return True
@@ -164,8 +168,12 @@ def test_lazy_generation():
                     return_logprobs=(temp > 0),
                 )
             ):
-                token, logprob = token_or_tuple
-                token_text = tokenizer.decode([token])
+                token, logprob = (
+                    token_or_tuple  # pyright: ignore[reportGeneralTypeIssues]
+                )
+                token_text = tokenizer.decode(
+                    [token]  # pyright: ignore[reportArgumentType]
+                )
                 print(f"  Token {i+1}: {repr(token_text)} (logprob: {logprob:.3f})")
                 generated_tokens.append(token)
 

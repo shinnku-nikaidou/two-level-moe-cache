@@ -26,18 +26,12 @@ class ExpertCacheFactory:
     # Registry of available cache implementations
     _cache_implementations: Dict[str, type] = {
         "lru": LRUExpertCacheManager,
-        "direct_vram": DirectVRAMExpertCache,  # Simple use-and-delete cache
-        # Future implementations can be added here:
-        # "lfu": LFUExpertCacheManager,
-        # "adaptive": AdaptiveExpertCacheManager,
+        "direct_vram": DirectVRAMExpertCache,
     }
 
     # Registry of available memory tier managers
     _tier_manager_implementations: Dict[str, type] = {
         "set_based": SetBasedMemoryTierManager,
-        # Future implementations:
-        # "priority_queue": PriorityQueueMemoryTierManager,
-        # "weighted": WeightedMemoryTierManager,
     }
 
     @classmethod
@@ -46,8 +40,6 @@ class ExpertCacheFactory:
         model_type: ModelType,
         config: Optional[CacheConfig] = None,
         tier_manager: Optional[IMemoryTierManager] = None,
-        checkpoint_path: Optional[str] = None,
-        **kwargs,
     ) -> IExpertCache:
         """
         Create an LRU-based expert cache.
@@ -56,9 +48,6 @@ class ExpertCacheFactory:
             model_type: Type of model for configuration
             config: Cache configuration (optional)
             tier_manager: Memory tier manager (optional)
-            checkpoint_path: Path to checkpoint directory for adapter creation
-            **kwargs: Additional arguments
-
         Returns:
             LRU expert cache manager
         """
@@ -85,7 +74,6 @@ class ExpertCacheFactory:
     def create_direct_vram_cache(
         cls,
         model_type: ModelType,
-        **kwargs,
     ) -> IExpertCache:
         """
         Create a direct VRAM cache for use-and-delete strategy.
@@ -96,7 +84,6 @@ class ExpertCacheFactory:
 
         Args:
             model_type: Type of model for expert loading
-            **kwargs: Additional arguments (ignored for simplicity)
 
         Returns:
             Direct VRAM expert cache

@@ -68,7 +68,6 @@ def test_expert_cache_single():
     expert_cache = ExpertCacheFactory.create_lru_cache(
         model_type=ModelType.GPT_OSS_20B,
         config=cache_config,
-        checkpoint_path=MODEL_PATH,
     )
 
     print(f"Expert cache created: {type(expert_cache)}")
@@ -113,7 +112,6 @@ def test_expert_cache_batch():
     expert_cache = ExpertCacheFactory.create_lru_cache(
         model_type=ModelType.GPT_OSS_20B,
         config=cache_config,
-        checkpoint_path=MODEL_PATH,
     )
 
     # Create multiple expert keys
@@ -169,7 +167,6 @@ def test_lazy_tensor_simulation():
     expert_cache = ExpertCacheFactory.create_lru_cache(
         model_type=ModelType.GPT_OSS_20B,
         config=cache_config,
-        checkpoint_path=MODEL_PATH,
     )
 
     # Simulate expert indices from routing (like in real usage)

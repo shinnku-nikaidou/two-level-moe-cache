@@ -8,7 +8,6 @@ components with domain-specific optimizations like expert caching.
 import os
 import json
 import torch
-import torch.distributed as dist
 
 from ...boilerplate.gpt_oss.model import (
     ModelConfig,
@@ -18,7 +17,6 @@ from ...boilerplate.gpt_oss.model import (
 from ...boilerplate.gpt_oss.weights import Checkpoint
 from ..cache.interfaces.expert_cache import IExpertCache
 from ...services.cache import ExpertCacheFactory
-from ...config import CacheConfig
 from ...domain import ModelType
 from .moe import LazyMLPBlock
 
@@ -98,13 +96,9 @@ class LazyTransformer(torch.nn.Module):
                 )
 
             # Ensure we have directory path for Checkpoint class
-            checkpoint_dir = self._ensure_checkpoint_dir(checkpoint_path)
 
             # Auto-detect model type from checkpoint path
-            model_type = self._detect_model_type(checkpoint_dir)
-
-            # Create cache configuration optimized for the model
-            cache_config = CacheConfig.for_model(model_type)
+            model_type = self._detect_model_type(checkpoint_path)
 
             # Create simple DirectVRAM cache for maximum performance
             # This implements "use-and-delete" strategy - no complex LRU management
@@ -159,13 +153,6 @@ class LazyTransformer(torch.nn.Module):
         else:
             # Default to 20B model if cannot detect
             return ModelType.GPT_OSS_20B
-
-    def _ensure_checkpoint_dir(self, checkpoint_path: str) -> str:
-        """Ensure checkpoint_path points to directory, not file"""
-        if checkpoint_path.endswith(".safetensors"):
-            # If it's a file path, use its directory
-            return os.path.dirname(checkpoint_path)
-        return checkpoint_path
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through the lazy transformer."""
