@@ -87,7 +87,7 @@ class LazyTransformer(torch.nn.Module):
         # Create expert cache using model_type (no external dependencies needed)
         # Create simple DirectVRAM cache for maximum performance
         # This implements "use-and-delete" strategy - no complex LRU management
-        self.expert_cache_manager = ExpertCacheFactory.create_direct_vram_cache(
+        self.expert_cache_manager = ExpertCacheFactory.create_direct_nvme_cache_manager(
             model_type=model_type,
         )
 

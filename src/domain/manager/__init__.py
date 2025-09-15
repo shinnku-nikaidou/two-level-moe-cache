@@ -6,7 +6,7 @@ for expert caching and memory tier coordination.
 """
 
 from .memory_tier import SetBasedMemoryTierManager
-from .lru_expert_cache import LRUExpertCacheManager
+from .lru import LRUExpertCacheManager
 
 __all__ = [
     "SetBasedMemoryTierManager",

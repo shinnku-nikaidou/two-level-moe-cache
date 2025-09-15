@@ -14,7 +14,7 @@ from src.domain.cache.entities.types import ExpertKey
 from src.domain import ModelType
 
 
-class DirectVRAMExpertCache(IExpertCacheManager):
+class DirectNVMEExpertCacheManager(IExpertCacheManager):
     """
     Direct VRAM loading cache with immediate cleanup.
 

@@ -9,8 +9,8 @@ from typing import Optional, Dict
 from src.config.cache_config import CacheConfig
 from src.domain.cache.interfaces.expert_cache import IExpertCacheManager
 from src.domain.cache.interfaces.memory_tier import IMemoryTierManager
-from src.domain.manager.lru_expert_cache import LRUExpertCacheManager
-from src.domain.manager.direct_vram_cache import DirectVRAMExpertCache
+from src.domain.manager.lru import LRUExpertCacheManager
+from src.domain.manager.direct_nvme import DirectNVMEExpertCacheManager
 from src.domain.manager.memory_tier import SetBasedMemoryTierManager
 from src.domain import ModelType
 
@@ -26,11 +26,11 @@ class ExpertCacheFactory:
     # Registry of available cache implementations
     _cache_implementations: Dict[str, type] = {
         "lru": LRUExpertCacheManager,
-        "direct_vram": DirectVRAMExpertCache,
+        "direct_vram": DirectNVMEExpertCacheManager,
     }
 
     @classmethod
-    def create_lru_cache(
+    def create_lru_cache_manager(
         cls,
         model_type: ModelType,
         config: Optional[CacheConfig] = None,
@@ -63,7 +63,7 @@ class ExpertCacheFactory:
         )
 
     @classmethod
-    def create_direct_vram_cache(
+    def create_direct_nvme_cache_manager(
         cls,
         model_type: ModelType,
     ) -> IExpertCacheManager:
@@ -80,4 +80,4 @@ class ExpertCacheFactory:
         Returns:
             Direct VRAM expert cache
         """
-        return DirectVRAMExpertCache(model_type=model_type)
+        return DirectNVMEExpertCacheManager(model_type=model_type)
