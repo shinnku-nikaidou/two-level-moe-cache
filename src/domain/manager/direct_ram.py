@@ -7,7 +7,7 @@ copy from RAM to VRAM for computation. This maximizes access speed by
 eliminating all disk I/O during inference.
 """
 
-from typing import Dict, List
+from typing import List, Set
 from src.domain.cache.interfaces.expert_cache import IExpertCacheManager
 from src.domain.cache.entities.expert import Expert
 from src.domain.cache.entities.types import ExpertKey
@@ -48,6 +48,9 @@ class DirectRAMExpertCacheManager(IExpertCacheManager):
         """
         # Call base constructor to pre-create all Expert instances
         super().__init__(model_type)
+
+        # Track experts currently in VRAM (for batch eviction)
+        self._vram_expert_keys: Set[ExpertKey] = set()
 
         # 🔥 CORE FEATURE: Pre-warm ALL experts to RAM during init
         print(f"🔥 Pre-warming {len(self._experts)} experts to RAM...")
@@ -98,6 +101,9 @@ class DirectRAMExpertCacheManager(IExpertCacheManager):
         # This creates VRAM copy while keeping RAM copy as cache
         expert.ram_to_vram()
 
+        # Track this expert as having a VRAM copy
+        self._vram_expert_keys.add(key)
+
         return expert
 
     def get_batch(self, keys: List[ExpertKey]) -> List[Expert]:
@@ -120,8 +126,9 @@ class DirectRAMExpertCacheManager(IExpertCacheManager):
         result = []
 
         # Process each expert with RAM-to-VRAM copy
+        # Note: VRAM tracking happens automatically via get() calls
         for key in keys:
-            expert = self.get(key)  # Reuse single-expert logic
+            expert = self.get(key)  # Reuse single-expert logic (includes VRAM tracking)
             result.append(expert)
 
         return result
@@ -138,6 +145,25 @@ class DirectRAMExpertCacheManager(IExpertCacheManager):
             if expert.is_in_vram:
                 expert.vram_to_ram()  # Remove VRAM, keep RAM
 
+        # Clear VRAM tracking set
+        self._vram_expert_keys.clear()
+
     def next(self) -> None:
-        """No-op for pre-warmed cache - no time-based policies needed."""
-        pass
+        """
+        Batch evict all VRAM copies while keeping RAM cache intact.
+
+        This clears all VRAM copies to free GPU memory while preserving
+        the pre-warmed RAM cache for future use. This is the key method
+        for preventing VRAM memory leaks in the DirectRAM strategy.
+        """
+        if not self._vram_expert_keys:
+            return  # No VRAM experts to evict
+
+        # Batch evict all VRAM copies while keeping RAM copies
+        for key in list(self._vram_expert_keys):  # Copy to avoid iteration issues
+            expert = self._get_expert(key)
+            if expert.is_in_vram:
+                expert.vram_to_ram()  # Remove VRAM copy, keep RAM copy
+
+        # Clear the tracking set
+        self._vram_expert_keys.clear()

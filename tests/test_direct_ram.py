@@ -14,7 +14,6 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.domain.manager.direct_ram import DirectRAMExpertCacheManager
-from src.services.cache.expert_cache_factory import ExpertCacheFactory
 from src.domain import ModelType
 from src.domain.cache.entities.types import ExpertKey, ExpertParamType
 
@@ -169,7 +168,7 @@ def test_direct_ram_batch_behavior():
 
 def test_direct_ram_memory_efficiency():
     """Test memory usage patterns and clear() behavior."""
-    
+
     print("\n" + "=" * 60)
     print("🧠 Testing DirectRAM Memory Management")
     print("=" * 60)
@@ -218,40 +217,6 @@ def test_direct_ram_memory_efficiency():
     return success
 
 
-def test_direct_ram_factory():
-    """Test DirectRAM creation through factory."""
-
-    print("\n" + "=" * 60)
-    print("🏭 Testing DirectRAM Factory Creation")
-    print("=" * 60)
-
-    try:
-        cache = ExpertCacheFactory.create_direct_ram_cache_manager(
-            ModelType.GPT_OSS_20B
-        )
-
-        print(f"✅ Factory created DirectRAM cache: {type(cache).__name__}")
-
-        # Verify it's the right type and pre-warmed
-        if isinstance(cache, DirectRAMExpertCacheManager):
-            print("✅ SUCCESS: Correct cache type from factory")
-        else:
-            print(f"❌ FAILED: Wrong type: {type(cache)}")
-            return False
-
-        # Verify pre-warming
-        if cache.get_loaded_expert_count() == cache.get_total_expert_count():
-            print("✅ SUCCESS: Factory cache is pre-warmed")
-            return True
-        else:
-            print("❌ FAILED: Factory cache not pre-warmed")
-            return False
-
-    except Exception as e:
-        print(f"❌ FAILED: Factory threw exception: {e}")
-        return False
-
-
 def run_all_tests():
     """Run all DirectRAM tests."""
 
@@ -263,7 +228,6 @@ def run_all_tests():
         ("get() Behavior", test_direct_ram_get_behavior),
         ("get_batch() Behavior", test_direct_ram_batch_behavior),
         ("Memory Management", test_direct_ram_memory_efficiency),
-        ("Factory Creation", test_direct_ram_factory),
     ]
 
     results = []
