@@ -79,60 +79,6 @@ class LazyTokenGenerator:
                 break
 
 
-def test_basic_functionality():
-    """Test basic LazyTransformer functionality without generation loop"""
-    print("Basic Functionality Test")
-    print("=" * 60)
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
-
-    # Load LazyTransformer (device is configured globally)
-    model = LazyTransformer.from_model_type(ModelType.GPT_OSS_20B)
-    print("LazyTransformer loaded successfully")
-
-    # Get tokenizer
-    tokenizer = get_tokenizer()
-
-    # Test simple forward pass
-    prompt = "Hello"
-    tokens = tokenizer.encode(prompt)
-    test_input = torch.as_tensor(tokens, dtype=torch.int32, device=device)
-
-    print(f"\nTesting forward pass:")
-    print(f"Input: '{prompt}' -> tokens: {tokens}")
-    print(f"Input tensor: {test_input.shape}, dtype: {test_input.dtype}")
-
-    try:
-        with torch.no_grad():
-            output = model(test_input)
-
-        print(f"✅ Forward pass successful!")
-        print(f"Output shape: {output.shape}, dtype: {output.dtype}")
-
-        # Get top predictions
-        logits = output[0]  # First (and only) token's logits
-        top_5_probs, top_5_indices = torch.topk(torch.softmax(logits, dim=-1), 5)
-
-        print(f"\nTop 5 predictions:")
-        for i in range(5):
-            token_id = top_5_indices[i].item()
-            prob = top_5_probs[i].item()
-            token_text = tokenizer.decode(
-                [token_id]  # pyright: ignore[reportArgumentType]
-            )
-            print(f"  {i+1}. {repr(token_text)} (prob: {prob:.4f})")
-
-        return True
-
-    except Exception as e:
-        print(f"Forward pass failed: {e}")
-        import traceback
-
-        traceback.print_exc()
-        return False
-
-
 def test_lazy_generation():
     """Test LazyTransformer generation"""
     print("Lazy MoE TransformerTest")
@@ -169,16 +115,12 @@ def test_lazy_generation():
                     return_logprobs=(temp > 0),
                 )
             ):
-                token, logprob = (
-                    token_or_tuple  # pyright: ignore[reportGeneralTypeIssues]
-                )
-                token_text = tokenizer.decode(
-                    [token]  # pyright: ignore[reportArgumentType]
-                )
+                token, logprob = token_or_tuple
+                token_text = tokenizer.decode([token])
                 print(f"  Token {i+1}: {repr(token_text)} (logprob: {logprob:.3f})")
                 generated_tokens.append(token)
 
-                if i >= 5:  # Stop after 3 tokens
+                if i >= 5:  # Stop after 5 tokens
                     break
 
             # Decode full text
@@ -200,13 +142,7 @@ if __name__ == "__main__":
     print(f"Model path: {MODEL_PATH}")
 
     try:
-        # First test basic functionality
-        if test_basic_functionality():
-            print("\n" + "=" * 60)
-            # Then test generation if basic test passes
-            test_lazy_generation()
-
+        test_lazy_generation()
     except Exception as e:
         print(f"\nTest failed: {e}")
-
         traceback.print_exc()

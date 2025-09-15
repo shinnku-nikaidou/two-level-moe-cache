@@ -6,7 +6,6 @@ are loaded directly to VRAM when needed and immediately unloaded after use.
 No persistence, no LRU management - maximum simplicity for maximum performance.
 """
 
-import torch
 from typing import List, Set
 from src.domain.cache.interfaces.expert_cache import IExpertCacheManager
 from src.domain.cache.entities.expert import Expert
