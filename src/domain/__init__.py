@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class ModelType(Enum):
     """
     Supported model types for expert weight caching.

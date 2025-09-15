@@ -3,13 +3,11 @@ GPT-OSS model expert weight adapter.
 """
 
 import os
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 import torch
 from src.boilerplate.gpt_oss.weights import Checkpoint
+from src.domain.cache.entities.types import ExpertKey
 from .base import ExpertAdapter
-
-if TYPE_CHECKING:
-    from src.domain.cache.entities.expert import ExpertKey
 
 
 class GPTOSSExpertAdapter(ExpertAdapter):
@@ -41,7 +39,7 @@ class GPTOSSExpertAdapter(ExpertAdapter):
             self._checkpoint = Checkpoint(model_file, device=torch.device("cpu"))
         return self._checkpoint
 
-    def load_expert_tensor(self, expert_key: "ExpertKey") -> torch.Tensor:
+    def load_expert_tensor(self, expert_key: ExpertKey) -> torch.Tensor:
         """
         Load a specific expert tensor from GPT-OSS checkpoint.
 
@@ -64,7 +62,7 @@ class GPTOSSExpertAdapter(ExpertAdapter):
 
         return expert_tensor
 
-    def is_supported(self, expert_key: "ExpertKey") -> bool:
+    def is_supported(self, expert_key: ExpertKey) -> bool:
         """
         Check if the expert key is valid for GPT-OSS models.
 

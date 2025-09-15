@@ -114,7 +114,7 @@ class LazyTransformer(torch.nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass through the lazy transformer."""        
+        """Forward pass through the lazy transformer."""
         # Components should already be on the correct device from initialization
         x = self.embedding(x)
         for block in self.block:
@@ -124,9 +124,7 @@ class LazyTransformer(torch.nn.Module):
         return x
 
     @staticmethod
-    def from_checkpoint(
-        path: str, device: str | torch.device
-    ) -> "LazyTransformer":
+    def from_checkpoint(path: str, device: str | torch.device) -> "LazyTransformer":
         """
         Load transformer from checkpoint with lazy loading.
 

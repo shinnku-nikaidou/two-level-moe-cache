@@ -1,11 +1,8 @@
 """
-Cache entities for expert weight management.
+Core entities for the expert weight caching system.
 """
 
-from .expert import Expert, ExpertKey, MemoryTier
+from .types import ExpertKey, MemoryTier
+from .expert import Expert
 
-__all__ = [
-    "Expert",
-    "ExpertKey", 
-    "MemoryTier",
-]
+__all__ = ["Expert", "ExpertKey", "MemoryTier"]
