@@ -7,11 +7,11 @@ No persistence, no LRU management - maximum simplicity for maximum performance.
 """
 
 import torch
-from typing import Dict, List, Optional, Any
-from ..cache.interfaces.expert_cache import IExpertCacheManager
-from ..cache.entities.expert import Expert
-from ..cache.entities.types import ExpertKey, MemoryTier
-from ...domain import ModelType
+from typing import Dict, List
+from src.domain.cache.interfaces.expert_cache import IExpertCacheManager
+from src.domain.cache.entities.expert import Expert
+from src.domain.cache.entities.types import ExpertKey
+from src.domain import ModelType
 
 
 class DirectVRAMExpertCache(IExpertCacheManager):
@@ -40,14 +40,6 @@ class DirectVRAMExpertCache(IExpertCacheManager):
         # Track currently loaded experts for cleanup
         self._loaded_experts: Dict[ExpertKey, Expert] = {}
 
-        # Simple statistics tracking
-        self._stats = {
-            "loads": 0,
-            "unloads": 0,
-            "batch_loads": 0,
-            "batch_unloads": 0,
-        }
-
     def get(self, key: ExpertKey) -> Expert:
         """
         Load a single expert directly to VRAM.
@@ -68,7 +60,6 @@ class DirectVRAMExpertCache(IExpertCacheManager):
         # Always load fresh - no caching
         expert = self._load_expert_to_vram(key)
         self._loaded_experts[key] = expert
-        self._stats["loads"] += 1
 
         return expert
 
@@ -104,9 +95,6 @@ class DirectVRAMExpertCache(IExpertCacheManager):
             self._loaded_experts[key] = expert
             result.append(expert)
 
-        self._stats["batch_loads"] += 1
-        self._stats["loads"] += len(keys)
-
         return result
 
     def clear(self) -> None:
@@ -140,7 +128,6 @@ class DirectVRAMExpertCache(IExpertCacheManager):
 
         expert = self._loaded_experts.pop(key)
         expert.unload()  # Free VRAM memory
-        self._stats["unloads"] += 1
 
         return True
 
@@ -158,9 +145,6 @@ class DirectVRAMExpertCache(IExpertCacheManager):
         for key in keys:
             if self._evict(key):
                 unloaded_count += 1
-
-        if unloaded_count > 0:
-            self._stats["batch_unloads"] += 1
 
         return unloaded_count
 

@@ -47,15 +47,6 @@ class LRUExpertCacheManager(IExpertCacheManager):
         self._max_ram_experts = max_ram_experts
         self._model_type = model_type
 
-        # Statistics tracking
-        self._stats = {
-            "hits": 0,
-            "misses": 0,
-            "evictions": 0,
-            "loads": 0,
-            "tier_migrations": 0,
-        }
-
     def get(self, key: ExpertKey) -> Expert:
         """
         Retrieve a single expert by key, loading if necessary.
@@ -73,14 +64,12 @@ class LRUExpertCacheManager(IExpertCacheManager):
             # Cache hit: move to end (most recently used)
             expert = self._experts.pop(key)
             self._experts[key] = expert
-            self._stats["hits"] += 1
 
             # Ensure expert is in appropriate tier
             self._ensure_expert_tier(key, expert)
             return expert
 
         # Cache miss: load expert
-        self._stats["misses"] += 1
         expert = self._load_expert(key)
         self._put(key, expert)
         return expert
@@ -114,11 +103,9 @@ class LRUExpertCacheManager(IExpertCacheManager):
                 # Store in dict for device consistency check
                 experts_dict[key] = expert
 
-                self._stats["hits"] += 1
                 self._ensure_expert_tier(key, expert)
             else:
                 missing_keys.append(key)
-                self._stats["misses"] += 1
 
         # Load missing experts in batch
         for key in missing_keys:
@@ -141,9 +128,6 @@ class LRUExpertCacheManager(IExpertCacheManager):
         """
         # Clear experts
         self._experts.clear()
-        
-        # Reset stats
-        self._stats["evictions"] = 0
 
     def _put(self, key: ExpertKey, expert: Expert) -> None:
         """
@@ -194,7 +178,6 @@ class LRUExpertCacheManager(IExpertCacheManager):
         # Add to DISK tier tracking for consistency
         self._tier_manager.add_to_tier(MemoryTier.DISK, key)
 
-        self._stats["evictions"] += 1
         return True
 
     def _load_expert(self, key: ExpertKey) -> Expert:
@@ -222,7 +205,6 @@ class LRUExpertCacheManager(IExpertCacheManager):
             expert.load_from_nvme_to_ram()  # Load to RAM
             self._tier_manager.add_to_tier(MemoryTier.RAM, key)
 
-        self._stats["loads"] += 1
         return expert
 
     def _ensure_expert_tier(self, key: ExpertKey, expert: Expert) -> None:
@@ -246,7 +228,6 @@ class LRUExpertCacheManager(IExpertCacheManager):
                 self._tier_manager.add_to_tier(MemoryTier.VRAM, key)
 
             expert.move_to_vram()  # Promote to VRAM
-            self._stats["tier_migrations"] += 1
 
     def _enforce_capacity_limits(self) -> None:
         """
@@ -275,7 +256,6 @@ class LRUExpertCacheManager(IExpertCacheManager):
                     self._tier_manager.move_between_tiers(
                         key, MemoryTier.VRAM, MemoryTier.RAM
                     )
-                    self._stats["tier_migrations"] += 1
 
         # Evict from RAM to DISK if over limit
         if ram_count > self._max_ram_experts:
@@ -336,8 +316,6 @@ class LRUExpertCacheManager(IExpertCacheManager):
                             )
                         else:
                             self._tier_manager.add_to_tier(MemoryTier.VRAM, key)
-
-                        self._stats["tier_migrations"] += 1
 
                     except RuntimeError:
                         # VRAM promotion failed, ensure at least on CPU
