@@ -44,19 +44,21 @@ class ExpertCacheFactory:
         model_type: ModelType,
         config: Optional[CacheConfig] = None,
         tier_manager: Optional[IMemoryTierManager] = None,
+        checkpoint_path: Optional[str] = None,
         **kwargs,
     ) -> IExpertCache:
         """
         Create an LRU-based expert cache.
 
         Args:
-            model_type: Model type for expert loading
-            config: Cache configuration (creates default if None)
-            tier_manager: Memory tier manager (creates default if None)
-            **kwargs: Additional parameters for cache creation
+            model_type: Type of model for configuration
+            config: Cache configuration (optional)
+            tier_manager: Memory tier manager (optional)
+            checkpoint_path: Path to checkpoint directory for adapter creation
+            **kwargs: Additional arguments
 
         Returns:
-            Configured LRU expert cache instance
+            LRU expert cache manager
         """
         # Use provided config or create default
         if config is None:
@@ -67,12 +69,14 @@ class ExpertCacheFactory:
             tier_manager = SetBasedMemoryTierManager()
 
         # Create LRU cache with configuration
+        # Note: checkpoint_path is not passed to LRUExpertCacheManager directly
+        # It will be used by the adapter when needed
         return LRUExpertCacheManager(
             model_type=model_type,
             memory_tier_manager=tier_manager,
             max_vram_experts=config.max_vram_experts,
             max_ram_experts=config.max_ram_experts,
-            **kwargs,
+            # Don't pass checkpoint_path to the cache manager
         )
 
     @classmethod

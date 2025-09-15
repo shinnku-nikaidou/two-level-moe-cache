@@ -106,7 +106,11 @@ class LRUExpertCacheManager(IExpertCache):
             if key in self._experts:
                 expert = self._experts.pop(key)
                 self._experts[key] = expert  # Move to end (LRU)
-                result[key] = expert
+
+                # Return a copy of the expert to avoid shared reference issues
+                expert_copy = self._copy_expert_data(expert)
+                result[key] = expert_copy
+
                 self._stats["hits"] += 1
                 self._ensure_expert_tier(key, expert)
             else:
@@ -164,11 +168,11 @@ class LRUExpertCacheManager(IExpertCache):
         if current_tier:
             self._tier_manager.remove_from_tier(current_tier, key)
 
-        # Move expert to disk if not already there
-        if expert.current_tier != MemoryTier.DISK:
-            expert.unload()  # Move to disk by unloading
-            self._tier_manager.add_to_tier(MemoryTier.DISK, key)
-            self._stats["tier_migrations"] += 1
+        # IMPORTANT: Do NOT unload the expert data here!
+        # The expert instance might still be referenced elsewhere.
+        # Just remove it from the cache and let garbage collection handle it.
+        # Add to DISK tier tracking for consistency
+        self._tier_manager.add_to_tier(MemoryTier.DISK, key)
 
         self._stats["evictions"] += 1
         return True
@@ -338,3 +342,30 @@ class LRUExpertCacheManager(IExpertCache):
             # Move to disk and remove from cache
             for key in lru_experts:
                 self.evict(key)
+
+    def _copy_expert_data(self, expert: Expert) -> Expert:
+        """
+        Create a copy of expert with independent data to avoid shared reference issues.
+
+        Args:
+            expert: Original expert instance
+
+        Returns:
+            New expert instance with copied data
+        """
+        # Create new expert instance with same key and model type
+        expert_copy = Expert(
+            expert_key=expert.expert_key,
+            model_type=self._model_type,
+            current_tier=expert.current_tier,
+            data=(
+                expert.data.clone() if expert.data is not None else None
+            ),  # Deep copy tensor data
+            device=expert.device,
+        )
+
+        # Copy access tracking info
+        expert_copy.last_access_time = expert.last_access_time
+        expert_copy.access_count = expert.access_count
+
+        return expert_copy

@@ -32,11 +32,11 @@ class GPTOSSExpertAdapter(ExpertAdapter):
     def checkpoint(self) -> Checkpoint:
         """Lazy load the checkpoint."""
         if self._checkpoint is None:
-            model_file = os.path.join(self.checkpoint_path, "model.safetensors")
-            if not os.path.exists(model_file):
-                raise FileNotFoundError(f"Checkpoint file not found: {model_file}")
+            # Checkpoint class expects directory path, not file path
             # Use CPU device by default for loading, will move to target device later
-            self._checkpoint = Checkpoint(model_file, device=torch.device("cpu"))
+            self._checkpoint = Checkpoint(
+                self.checkpoint_path, device=torch.device("cpu")
+            )
         return self._checkpoint
 
     def load_expert_tensor(self, expert_key: ExpertKey) -> torch.Tensor:
@@ -56,6 +56,9 @@ class GPTOSSExpertAdapter(ExpertAdapter):
 
         # Load full tensor using Checkpoint class (handles MXFP4 conversion automatically)
         full_tensor = self.checkpoint.get(param_name)
+
+        if full_tensor is None:
+            raise RuntimeError(f"Failed to load parameter {param_name} from checkpoint")
 
         # Extract the specific expert slice
         expert_tensor = self._extract_expert_slice(full_tensor, expert_key)

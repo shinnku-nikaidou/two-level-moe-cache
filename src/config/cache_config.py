@@ -79,16 +79,27 @@ class CacheConfig:
                 1, int(vram_limit_mb * 0.6 // expert_size_mb)
             )  # Use 60% of VRAM
         else:
-            # Default conservative limits
-            max_vram_experts = 8 if model_type == ModelType.GPT_OSS_120B else 16
+            # Default conservative limits - increased for better performance
+            if model_type == ModelType.GPT_OSS_120B:
+                max_vram_experts = 8  # Larger model, fewer experts in VRAM
+            elif model_type == ModelType.GPT_OSS_20B:
+                max_vram_experts = 16  # Reasonable VRAM capacity
+            else:
+                max_vram_experts = 32  # Default for unknown models
 
         if ram_limit_mb is not None:
             max_ram_experts = max(
                 1, int(ram_limit_mb * 0.3 // expert_size_mb)
             )  # Use 30% of RAM
         else:
-            # Default limits based on model size
-            max_ram_experts = 16 if model_type == ModelType.GPT_OSS_120B else 64
+            # Default limits based on model size - increased for better performance
+            # GPT-OSS requires more experts for full forward pass
+            if model_type == ModelType.GPT_OSS_120B:
+                max_ram_experts = 64  # Larger model, fewer experts in RAM
+            elif model_type == ModelType.GPT_OSS_20B:
+                max_ram_experts = 64  # Reasonable capacity, should evict when full
+            else:
+                max_ram_experts = 128  # Default for unknown models
 
         return cls(
             model_type=model_type,

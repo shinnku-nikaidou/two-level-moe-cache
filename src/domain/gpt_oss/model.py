@@ -2,7 +2,7 @@
 Integration layer for memory-efficient GPT-OSS model implementations.
 
 This module provides integrated model classes that combine boilerplate
-components with domain-specific optimizations like lazy loading.
+components with domain-specific optimizations like expert caching.
 """
 
 import os
@@ -16,6 +16,10 @@ from ...boilerplate.gpt_oss.model import (
     RMSNorm,
 )
 from ...boilerplate.gpt_oss.weights import Checkpoint
+from ..cache.interfaces.expert_cache import IExpertCache
+from ...services.cache import ExpertCacheFactory
+from ...config import CacheConfig
+from ...domain import ModelType
 from .moe import LazyMLPBlock
 
 
@@ -23,15 +27,15 @@ class LazyTransformerBlock(torch.nn.Module):
     """
     Transformer block using LazyMLPBlock for memory-efficient expert loading.
 
-    Always uses lazy loading for MoE expert weights, automatically detects
-    device from input tensors.
+    Uses expert cache system for automatic memory management across
+    VRAM, RAM, and DISK tiers.
     """
 
     def __init__(
         self,
         config: ModelConfig,
         layer_idx: int,
-        checkpoint_path: str,
+        expert_cache: IExpertCache,
         device: torch.device | None = None,
     ):
         """
@@ -40,18 +44,17 @@ class LazyTransformerBlock(torch.nn.Module):
         Args:
             config: Model configuration
             layer_idx: Layer index
-            checkpoint_path: Path to checkpoint directory
+            expert_cache: Expert cache instance for loading weights
             device: Target device for components
         """
         super().__init__()
         self.layer_idx = layer_idx
-        self.checkpoint_path = checkpoint_path
 
         # Use regular attention block with specified device
         self.attn = AttentionBlock(config, layer_idx, device=device)
 
-        # Use lazy MLP block for memory efficiency with specified device
-        self.mlp = LazyMLPBlock(config, checkpoint_path, layer_idx, device=device)
+        # Use lazy MLP block with expert cache for memory efficiency
+        self.mlp = LazyMLPBlock(config, expert_cache, layer_idx, device=device)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through attention and lazy MLP blocks."""
@@ -62,56 +65,108 @@ class LazyTransformerBlock(torch.nn.Module):
 
 class LazyTransformer(torch.nn.Module):
     """
-    Memory-efficient Transformer using lazy loading for MoE expert weights.
+    Memory-efficient Transformer using expert cache system for MoE weights.
 
-    This model loads expert weights on-demand, significantly reducing
-    GPU memory usage compared to the standard implementation.
+    This model uses the expert caching system for automatic memory management
+    across VRAM, RAM, and DISK tiers, significantly reducing memory usage.
     """
 
     def __init__(
         self,
         config: ModelConfig,
         checkpoint_path: str | None = None,
+        expert_cache: IExpertCache | None = None,
         device: torch.device | None = None,
     ):
         """
-        Initialize lazy transformer.
+        Initialize lazy transformer with expert cache system.
 
         Args:
             config: Model configuration
-            checkpoint_path: Path to checkpoint directory (required for lazy loading)
+            checkpoint_path: Path to checkpoint directory (used if expert_cache is None)
+            expert_cache: Pre-configured expert cache (creates default if None)
             device: Target device for components
         """
         super().__init__()
         self.config = config
-        self.checkpoint_path = checkpoint_path
+
+        # Create expert cache if not provided
+        if expert_cache is None:
+            if checkpoint_path is None:
+                raise ValueError(
+                    "Either expert_cache or checkpoint_path must be provided"
+                )
+
+            # Ensure we have directory path for Checkpoint class
+            checkpoint_dir = self._ensure_checkpoint_dir(checkpoint_path)
+
+            # Auto-detect model type from checkpoint path
+            model_type = self._detect_model_type(checkpoint_dir)
+
+            # Create cache configuration optimized for the model
+            cache_config = CacheConfig.for_model(model_type)
+
+            # Create expert cache using factory
+            self.expert_cache = ExpertCacheFactory.create_lru_cache(
+                model_type=model_type,
+                config=cache_config,
+                checkpoint_path=checkpoint_dir,  # Pass directory path
+            )
+        else:
+            self.expert_cache = expert_cache
 
         # Standard components with specified device
         self.embedding = torch.nn.Embedding(
             config.vocab_size, config.hidden_size, dtype=torch.bfloat16, device=device
         )
 
-        # Always use lazy transformer blocks with specified device
-        if checkpoint_path:
-            self.block = torch.nn.ModuleList(
-                [
-                    LazyTransformerBlock(
-                        config, layer_idx, checkpoint_path, device=device
-                    )
-                    for layer_idx in range(config.num_hidden_layers)
-                ]
-            )
-        else:
-            raise ValueError("checkpoint_path is required for LazyTransformer")
+        # Use lazy transformer blocks with expert cache
+        self.block = torch.nn.ModuleList(
+            [
+                LazyTransformerBlock(
+                    config, layer_idx, self.expert_cache, device=device
+                )
+                for layer_idx in range(config.num_hidden_layers)
+            ]
+        )
 
         self.norm = RMSNorm(config.hidden_size, device=device)
         self.unembedding = torch.nn.Linear(
             config.hidden_size,
             config.vocab_size,
-            bias=False,
             dtype=torch.bfloat16,
+            bias=False,
             device=device,
         )
+
+    def _detect_model_type(self, checkpoint_path: str) -> ModelType:
+        """
+        Detect model type from checkpoint path.
+
+        Args:
+            checkpoint_path: Path to checkpoint directory
+
+        Returns:
+            Detected model type
+        """
+        checkpoint_path_lower = checkpoint_path.lower()
+
+        if "gpt-oss-20b" in checkpoint_path_lower:
+            return ModelType.GPT_OSS_20B
+        elif "gpt-oss-120b" in checkpoint_path_lower:
+            return ModelType.GPT_OSS_120B
+        elif "phi-tiny-moe" in checkpoint_path_lower:
+            return ModelType.PHI_TINY_MOE
+        else:
+            # Default to 20B model if cannot detect
+            return ModelType.GPT_OSS_20B
+
+    def _ensure_checkpoint_dir(self, checkpoint_path: str) -> str:
+        """Ensure checkpoint_path points to directory, not file"""
+        if checkpoint_path.endswith(".safetensors"):
+            # If it's a file path, use its directory
+            return os.path.dirname(checkpoint_path)
+        return checkpoint_path
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through the lazy transformer."""
@@ -129,7 +184,7 @@ class LazyTransformer(torch.nn.Module):
         Load transformer from checkpoint with lazy loading.
 
         Args:
-            path: Path to checkpoint directory
+            path: Path to checkpoint directory or file
             device: Target device
 
         Returns:
@@ -138,8 +193,13 @@ class LazyTransformer(torch.nn.Module):
         if not isinstance(device, torch.device):
             device = torch.device(device)
 
+        # Ensure we have directory path for Checkpoint class
+        checkpoint_dir = path
+        if path.endswith(".safetensors"):
+            checkpoint_dir = os.path.dirname(path)
+
         # Load configuration from checkpoint path (expects original subdirectory or direct path)
-        config_path = os.path.join(path, "config.json")
+        config_path = os.path.join(checkpoint_dir, "config.json")
         with open(config_path, "r") as f:
             json_config = json.load(f)
 
@@ -148,12 +208,12 @@ class LazyTransformer(torch.nn.Module):
 
         # Create lazy transformer with specified device
         model = LazyTransformer(
-            config=model_config, checkpoint_path=path, device=device
+            config=model_config, checkpoint_path=checkpoint_dir, device=device
         )
         model.eval()
 
         # Load non-expert weights normally - use correct device
-        checkpoint = Checkpoint(path, device)
+        checkpoint = Checkpoint(checkpoint_dir, device)
 
         my_rank = dist.get_rank() if dist.is_initialized() else 0
         world_size = dist.get_world_size() if dist.is_initialized() else 1
