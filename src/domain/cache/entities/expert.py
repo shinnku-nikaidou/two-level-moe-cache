@@ -8,6 +8,8 @@ from enum import Enum
 from typing import Optional, Union
 import torch
 
+from src.domain import ModelType
+
 
 class MemoryTier(Enum):
     """Memory storage tiers for expert weights."""
@@ -43,6 +45,7 @@ class Expert:
     def __init__(
         self,
         expert_key: ExpertKey,
+        model: ModelType,
         current_tier: MemoryTier = MemoryTier.DISK,
         data: Optional[torch.Tensor] = None,
         device: Optional[Union[str, torch.device]] = None,
@@ -60,8 +63,6 @@ class Expert:
         self.current_tier = current_tier
         self._data: Optional[torch.Tensor] = data
         self.device = torch.device(device) if device else None
-        self.last_access_time = time.time()
-        self.access_count = 0
 
     @property
     def data(self) -> Optional[torch.Tensor]:
@@ -87,45 +88,50 @@ class Expert:
             return 0
         return self._data.numel() * self._data.element_size()
 
-    def promote_to(self, target_tier: MemoryTier) -> None:
-        """
-        Promote this expert to a higher tier (faster access).
+    def load_from_nvme_to_ram(self) -> None:
+        pass
+    
+    def load_from_nvme_to_vram(self) -> None:
+        pass
 
-        Args:
-            target_tier: Target memory tier to promote to
-        """
-        if target_tier.value < self.current_tier.value:  # VRAM < RAM < DISK
-            self.current_tier = target_tier
+    def self_promote(self) -> None:
+        match self.current_tier:
+            case MemoryTier.DISK:
+                self.load_from_nvme()
+                self.current_tier = MemoryTier.RAM
+            case MemoryTier.RAM:
+                if self.device and self._data is not None:
+                    self._data = self._data.to(self.device)
+                    self.current_tier = MemoryTier.VRAM
+            case MemoryTier.VRAM:
+                pass  # Already at highest tier
+            
+    def self_demote(self) -> None:
+        match self.current_tier:
+            case MemoryTier.VRAM:
+                if self._data is not None:
+                    self._data = self._data.to("cpu")
+                    self.current_tier = MemoryTier.RAM
+            case MemoryTier.RAM:
+                self._data = None  # Unload from RAM, keep on DISK
+                self.current_tier = MemoryTier.DISK
+            case MemoryTier.DISK:
+                pass  # Already at lowest tier
 
-    def demote_to(self, target_tier: MemoryTier) -> None:
-        """
-        Demote this expert to a lower tier (slower access).
+    # def move_to_device(self, device: Union[str, torch.device]) -> None:
+    #     """
+    #     Move the tensor data to a specific device.
 
-        Args:
-            target_tier: Target memory tier to demote to
-        """
-        if target_tier.value > self.current_tier.value:
-            self.current_tier = target_tier
+    #     Args:
+    #         device: Target device (e.g., 'cuda', 'cpu')
+    #     """
+    #     if self._data is not None:
+    #         self.device = torch.device(device)
+    #         self._data = self._data.to(device)
 
-    def move_to_device(self, device: Union[str, torch.device]) -> None:
-        """
-        Move the tensor data to a specific device.
-
-        Args:
-            device: Target device (e.g., 'cuda', 'cpu')
-        """
-        if self._data is not None:
-            self.device = torch.device(device)
-            self._data = self._data.to(device)
-
-    def unload(self) -> None:
+    def destroy(self) -> None:
         """Unload the tensor data from memory."""
         self._data = None
-
-    def touch(self) -> None:
-        """Update access time and increment access count."""
-        self.last_access_time = time.time()
-        self.access_count += 1
 
     def __repr__(self):
         status = f"@{self.current_tier.value}"
