@@ -36,7 +36,7 @@ class IExpertCacheManager(ABC):
         pass
 
     @abstractmethod
-    def get_batch(self, keys: List[ExpertKey]) -> Dict[ExpertKey, Expert]:
+    def get_batch(self, keys: List[ExpertKey]) -> List[Expert]:
         """
         Retrieve multiple experts efficiently in batch.
 
@@ -44,7 +44,7 @@ class IExpertCacheManager(ABC):
             keys: List of expert identifiers
 
         Returns:
-            Dictionary mapping keys to expert instances
+            List of expert instances in the same order as keys
 
         Raises:
             KeyError: If any expert cannot be loaded

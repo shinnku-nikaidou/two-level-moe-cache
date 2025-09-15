@@ -74,13 +74,12 @@ class LazyExpertTensor:
         required_keys = [self._expert_keys[idx] for idx in indices_list]
 
         # Load experts from cache in batch
-        expert_dict: Dict[ExpertKey, Expert] = self.expert_cache.get_batch(
-            required_keys
-        )
+        expert_list: List[Expert] = self.expert_cache.get_batch(required_keys)
 
         # Extract tensors and build index mapping
         expert_tensors = {}
-        for key, expert in expert_dict.items():
+        for i, expert in enumerate(expert_list):
+            key = required_keys[i]  # experts are returned in same order as keys
             if expert.data is None:
                 raise RuntimeError(f"Expert {key} data is None after loading")
             expert_tensors[key.expert_id] = expert.data

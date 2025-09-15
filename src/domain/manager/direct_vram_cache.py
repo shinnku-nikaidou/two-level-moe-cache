@@ -72,7 +72,7 @@ class DirectVRAMExpertCache(IExpertCacheManager):
 
         return expert
 
-    def get_batch(self, keys: List[ExpertKey]) -> Dict[ExpertKey, Expert]:
+    def get_batch(self, keys: List[ExpertKey]) -> List[Expert]:
         """
         Load multiple experts directly to VRAM in batch.
 
@@ -83,7 +83,7 @@ class DirectVRAMExpertCache(IExpertCacheManager):
             keys: List of expert identifiers
 
         Returns:
-            Dictionary mapping keys to expert instances (all in VRAM)
+            List of expert instances (all in VRAM) in the same order as keys
 
         Raises:
             KeyError: If any expert cannot be loaded
@@ -96,13 +96,13 @@ class DirectVRAMExpertCache(IExpertCacheManager):
         # This ensures maximum memory efficiency with no manual management needed
         self.unload_all()
 
-        result = {}
+        result = []
 
-        # Load each expert directly to VRAM
+        # Load each expert directly to VRAM in order
         for key in keys:
             expert = self._load_expert_to_vram(key)
             self._loaded_experts[key] = expert
-            result[key] = expert
+            result.append(expert)
 
         self._stats["batch_loads"] += 1
         self._stats["loads"] += len(keys)

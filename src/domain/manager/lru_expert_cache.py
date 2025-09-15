@@ -85,7 +85,7 @@ class LRUExpertCacheManager(IExpertCacheManager):
         self.put(key, expert)
         return expert
 
-    def get_batch(self, keys: List[ExpertKey]) -> Dict[ExpertKey, Expert]:
+    def get_batch(self, keys: List[ExpertKey]) -> List[Expert]:
         """
         Retrieve multiple experts efficiently in batch.
 
@@ -96,12 +96,13 @@ class LRUExpertCacheManager(IExpertCacheManager):
             keys: List of expert identifiers
 
         Returns:
-            Dictionary mapping keys to expert instances
+            List of expert instances in the same order as keys
 
         Raises:
             KeyError: If any expert cannot be loaded
         """
-        result = {}
+        result = []
+        experts_dict = {}
         missing_keys = []
 
         # Collect cached experts and identify missing ones
@@ -110,9 +111,8 @@ class LRUExpertCacheManager(IExpertCacheManager):
                 expert = self._experts.pop(key)
                 self._experts[key] = expert  # Move to end (LRU)
 
-                # Return the expert directly - no copying needed
-                # The shared reference issue is handled by not calling unload() in evict()
-                result[key] = expert
+                # Store in dict for device consistency check
+                experts_dict[key] = expert
 
                 self._stats["hits"] += 1
                 self._ensure_expert_tier(key, expert)
@@ -124,10 +124,14 @@ class LRUExpertCacheManager(IExpertCacheManager):
         for key in missing_keys:
             expert = self._load_expert(key)
             self.put(key, expert)
-            result[key] = expert
+            experts_dict[key] = expert
 
         # IMPORTANT: Ensure all experts in batch are on same device for consistency
-        self._ensure_batch_device_consistency(result)
+        self._ensure_batch_device_consistency(experts_dict)
+
+        # Build result list in the same order as input keys
+        for key in keys:
+            result.append(experts_dict[key])
 
         return result
 
