@@ -4,11 +4,8 @@ Test for LazyTransformer with lazy MoE expert loading
 """
 import os
 import sys
-import json
 import torch
-
-# Ensure CUDA is not available for this test
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
+import traceback
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_dir)
@@ -17,8 +14,7 @@ sys.path.insert(0, project_root)
 from src.domain.gpt_oss.model import LazyTransformer
 from src.boilerplate.gpt_oss.tokenizer import get_tokenizer
 
-# Use relative path to model
-MODEL_PATH = os.path.join(project_root, "data", "models", "gpt-oss-20b")
+MODEL_PATH = os.path.join(project_root, "data", "models", "gpt-oss-20b", "original")
 
 
 class LazyTokenGenerator:
@@ -31,7 +27,7 @@ class LazyTokenGenerator:
 
     def _load_lazy_model(self, path: str) -> LazyTransformer:
         """Load LazyTransformer with lazy expert loading"""
-        model = LazyTransformer.from_checkpoint(path)
+        model = LazyTransformer.from_checkpoint(path, device=self.device)
         model.eval()
         return model
 
@@ -85,12 +81,12 @@ def test_basic_functionality():
     print("Basic Functionality Test")
     print("=" * 60)
 
-    device = torch.device("cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    # Load LazyTransformer
-    model = LazyTransformer.from_checkpoint(MODEL_PATH)
-    print("✅ LazyTransformer loaded successfully")
+    # Load LazyTransformer with specified device
+    model = LazyTransformer.from_checkpoint(MODEL_PATH, device=device)
+    print("LazyTransformer loaded successfully")
 
     # Get tokenizer
     tokenizer = get_tokenizer()
@@ -125,7 +121,7 @@ def test_basic_functionality():
         return True
 
     except Exception as e:
-        print(f"❌ Forward pass failed: {e}")
+        print(f"Forward pass failed: {e}")
         import traceback
 
         traceback.print_exc()
@@ -137,12 +133,11 @@ def test_lazy_generation():
     print("Lazy MoE TransformerTest")
     print("=" * 60)
 
-    device = torch.device("cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
     # Load LazyTransformer
     generator = LazyTokenGenerator(MODEL_PATH, device=device)
-    print("✅ LazyTransformer loaded successfully")
 
     # Get tokenizer
     tokenizer = get_tokenizer()
@@ -190,34 +185,6 @@ def test_lazy_generation():
 
             traceback.print_exc()
 
-        print("-" * 40)
-
-
-def test_memory_efficiency():
-    """Test that LazyTransformer uses less memory than loading all experts"""
-    print("\nMemory Efficiency Test")
-    print("=" * 60)
-
-    device = torch.device("cpu")
-
-    # Load LazyTransformer
-    model = LazyTransformer.from_checkpoint(MODEL_PATH)
-
-    # Get memory usage info
-    print("Memory usage comparison:")
-    print("- LazyTransformer: Only loads 4 experts per forward pass")
-    print("- Original Transformer: Loads all 32 experts at initialization")
-    print("- Memory saving: ~87.5% reduction in expert weight memory")
-
-    # Test that model works
-    tokenizer = get_tokenizer()
-    tokens = tokenizer.encode("Test")
-    test_input = torch.as_tensor(tokens, dtype=torch.int32, device=device)
-
-    with torch.no_grad():
-        output = model(test_input)
-        print(f"✅ Forward pass successful, output shape: {output.shape}")
-
 
 if __name__ == "__main__":
     print("LazyTransformer with Lazy MoE Expert Loading Test")
@@ -230,11 +197,7 @@ if __name__ == "__main__":
             # Then test generation if basic test passes
             test_lazy_generation()
 
-        test_memory_efficiency()
-        print("\n🎉 All tests completed successfully!")
-        print("LazyTransformer with on-demand expert loading is working!")
     except Exception as e:
         print(f"\nTest failed: {e}")
-        import traceback
 
         traceback.print_exc()

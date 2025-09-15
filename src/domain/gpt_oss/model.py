@@ -32,6 +32,7 @@ class LazyTransformerBlock(torch.nn.Module):
         config: ModelConfig,
         layer_idx: int,
         checkpoint_path: str,
+        device: torch.device | None = None,
     ):
         """
         Initialize lazy transformer block.
@@ -40,16 +41,17 @@ class LazyTransformerBlock(torch.nn.Module):
             config: Model configuration
             layer_idx: Layer index
             checkpoint_path: Path to checkpoint directory
+            device: Target device for components
         """
         super().__init__()
         self.layer_idx = layer_idx
         self.checkpoint_path = checkpoint_path
 
-        # Use regular attention block (device will be set during forward)
-        self.attn = AttentionBlock(config, layer_idx, device=None)
+        # Use regular attention block with specified device
+        self.attn = AttentionBlock(config, layer_idx, device=device)
 
-        # Use lazy MLP block for memory efficiency (device will be set during forward)
-        self.mlp = LazyMLPBlock(config, checkpoint_path, layer_idx, device=None)
+        # Use lazy MLP block for memory efficiency with specified device
+        self.mlp = LazyMLPBlock(config, checkpoint_path, layer_idx, device=device)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through attention and lazy MLP blocks."""
@@ -70,6 +72,7 @@ class LazyTransformer(torch.nn.Module):
         self,
         config: ModelConfig,
         checkpoint_path: str | None = None,
+        device: torch.device | None = None,
     ):
         """
         Initialize lazy transformer.
@@ -77,44 +80,42 @@ class LazyTransformer(torch.nn.Module):
         Args:
             config: Model configuration
             checkpoint_path: Path to checkpoint directory (required for lazy loading)
+            device: Target device for components
         """
         super().__init__()
         self.config = config
         self.checkpoint_path = checkpoint_path
 
-        # Standard components (device will be auto-detected)
+        # Standard components with specified device
         self.embedding = torch.nn.Embedding(
-            config.vocab_size, config.hidden_size, dtype=torch.bfloat16
+            config.vocab_size, config.hidden_size, dtype=torch.bfloat16, device=device
         )
 
-        # Always use lazy transformer blocks
+        # Always use lazy transformer blocks with specified device
         if checkpoint_path:
             self.block = torch.nn.ModuleList(
                 [
-                    LazyTransformerBlock(config, layer_idx, checkpoint_path)
+                    LazyTransformerBlock(
+                        config, layer_idx, checkpoint_path, device=device
+                    )
                     for layer_idx in range(config.num_hidden_layers)
                 ]
             )
         else:
             raise ValueError("checkpoint_path is required for LazyTransformer")
 
-        self.norm = RMSNorm(config.hidden_size, device=None)
+        self.norm = RMSNorm(config.hidden_size, device=device)
         self.unembedding = torch.nn.Linear(
             config.hidden_size,
             config.vocab_size,
             bias=False,
             dtype=torch.bfloat16,
+            device=device,
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass through the lazy transformer."""
-        # Auto-detect device from input and move components if needed
-        device = x.device
-        if self.embedding.weight.device != device:
-            self.embedding = self.embedding.to(device)
-            self.norm = self.norm.to(device)
-            self.unembedding = self.unembedding.to(device)
-
+        """Forward pass through the lazy transformer."""        
+        # Components should already be on the correct device from initialization
         x = self.embedding(x)
         for block in self.block:
             x = block(x)
@@ -124,7 +125,7 @@ class LazyTransformer(torch.nn.Module):
 
     @staticmethod
     def from_checkpoint(
-        path: str, device: str | torch.device = "cpu"  # 改为CPU默认
+        path: str, device: str | torch.device
     ) -> "LazyTransformer":
         """
         Load transformer from checkpoint with lazy loading.
@@ -139,53 +140,22 @@ class LazyTransformer(torch.nn.Module):
         if not isinstance(device, torch.device):
             device = torch.device(device)
 
-        # Load configuration from original subdirectory
-        original_path = os.path.join(path, "original")
-        config_path = os.path.join(original_path, "config.json")
+        # Load configuration from checkpoint path (expects original subdirectory or direct path)
+        config_path = os.path.join(path, "config.json")
         with open(config_path, "r") as f:
             json_config = json.load(f)
 
-            # Map from actual config to our ModelConfig
-            model_config = ModelConfig(
-                num_hidden_layers=json_config.get("num_hidden_layers", 24),
-                num_experts=json_config.get(
-                    "num_local_experts", 32
-                ),  # Note: different name
-                experts_per_token=json_config.get("experts_per_token", 4),
-                vocab_size=json_config.get("vocab_size", 201088),
-                hidden_size=json_config.get("hidden_size", 2880),
-                intermediate_size=json_config.get("intermediate_size", 2880),
-                swiglu_limit=json_config.get("swiglu_limit", 7.0),
-                head_dim=json_config.get("head_dim", 64),
-                num_attention_heads=json_config.get("num_attention_heads", 64),
-                num_key_value_heads=json_config.get("num_key_value_heads", 8),
-                sliding_window=json_config.get("sliding_window", 128),
-                initial_context_length=json_config.get("max_position_embeddings", 4096),
-                rope_theta=json_config.get("rope_theta", 150000.0),
-                # Handle rope_scaling if present
-                rope_scaling_factor=(
-                    json_config.get("rope_scaling", {}).get("factor", 32.0)
-                    if "rope_scaling" in json_config
-                    else 32.0
-                ),
-                rope_ntk_alpha=(
-                    json_config.get("rope_scaling", {}).get("beta_slow", 1.0)
-                    if "rope_scaling" in json_config
-                    else 1.0
-                ),
-                rope_ntk_beta=(
-                    json_config.get("rope_scaling", {}).get("beta_fast", 32.0)
-                    if "rope_scaling" in json_config
-                    else 32.0
-                ),
-            )
+            # Use direct mapping since original config matches ModelConfig fields
+            model_config = ModelConfig(**json_config)
 
-        # Create lazy transformer
-        model = LazyTransformer(config=model_config, checkpoint_path=original_path)
+        # Create lazy transformer with specified device
+        model = LazyTransformer(
+            config=model_config, checkpoint_path=path, device=device
+        )
         model.eval()
 
         # Load non-expert weights normally - use correct device
-        checkpoint = Checkpoint(original_path, device)  # 使用目标device
+        checkpoint = Checkpoint(path, device)
 
         my_rank = dist.get_rank() if dist.is_initialized() else 0
         world_size = dist.get_world_size() if dist.is_initialized() else 1
@@ -226,6 +196,10 @@ class LazyTransformer(torch.nn.Module):
                             * per_rank_intermediate_size : (my_rank + 1)
                             * per_rank_intermediate_size,
                         ]
+
+                # Ensure loaded tensor is on the same device as parameter
+                if loaded_tensor.device != param.device:
+                    loaded_tensor = loaded_tensor.to(param.device)
 
                 param.data.copy_(loaded_tensor)
 
