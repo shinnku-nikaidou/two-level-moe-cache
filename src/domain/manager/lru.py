@@ -336,3 +336,7 @@ class LRUExpertCacheManager(IExpertCacheManager):
                         )
                     else:
                         self._tier_manager.add_to_tier(MemoryTier.RAM, key)
+                        
+    def next(self) -> None:
+        pass
+

@@ -13,7 +13,6 @@ from src.domain.cache.entities.expert import Expert
 from src.domain.cache.entities.types import ExpertKey
 from src.domain import ModelType
 
-
 class DirectNVMEExpertCacheManager(IExpertCacheManager):
     """
     Direct VRAM loading cache with immediate cleanup.
@@ -169,3 +168,6 @@ class DirectNVMEExpertCacheManager(IExpertCacheManager):
         expert.nvme_to_vram()
 
         return expert
+
+    def next(self) -> None:
+        pass

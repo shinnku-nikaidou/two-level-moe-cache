@@ -60,3 +60,13 @@ class IExpertCacheManager(ABC):
         Useful for cleanup at end of generation or error recovery.
         """
         pass
+    
+    @abstractmethod
+    def next(self) -> None:
+        """
+        Advance internal state for time-based policies.
+
+        This can be used to implement time-based eviction or refresh
+        strategies in cache implementations that support it.
+        """
+        pass
