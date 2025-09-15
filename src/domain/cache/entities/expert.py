@@ -8,6 +8,7 @@ import torch
 from src.domain import ModelType
 from src.adapters.expert.factory import AdapterFactory
 from src.adapters.expert.base import ExpertAdapter
+from src.config import TORCH_VRAM_DEVICE, TORCH_RAM_DEVICE
 from .types import ExpertKey, MemoryTier
 
 
@@ -36,7 +37,7 @@ class Expert:
         self.expert_key = expert_key
         self.current_tier = current_tier
         self.data: Optional[torch.Tensor] = None
-        self.device: Optional[torch.device] = None
+        # Create adapter using factory with model type only
         self.adapter: ExpertAdapter = AdapterFactory.create_adapter(model_type)
 
     @property
@@ -55,93 +56,45 @@ class Expert:
             return 0
         return self.data.numel() * self.data.element_size()
 
-    def move_to_vram(self, device: Optional[Union[str, torch.device]] = None) -> None:
-        """
-        Move expert data to VRAM.
-
-        Args:
-            device: CUDA device to move to (defaults to self.device or "cuda")
-
-        Raises:
-            RuntimeError: If CUDA not available or data not loaded
-        """
-        if not torch.cuda.is_available():
-            raise RuntimeError("CUDA not available")
-
-        if not self.is_loaded or self.data is None:
-            raise RuntimeError("Cannot move unloaded expert to VRAM")
-
-        # Determine target CUDA device
-        if device is not None:
-            target_device = device
-        elif self.device is not None and "cuda" in str(self.device):
-            target_device = self.device
-        else:
-            target_device = "cuda"
-
-        self.data = self.data.to(target_device)
-        self.device = torch.device(target_device)
-        self.current_tier = MemoryTier.VRAM
+    def move_to_vram(self) -> None:
+        """Move expert data to VRAM."""
+        if self.data is not None:
+            self.data = self.data.to(TORCH_VRAM_DEVICE)
+            self.current_tier = MemoryTier.VRAM
 
     def move_to_ram(self) -> None:
         """Move expert data to RAM (CPU)."""
-        if not self.is_loaded or self.data is None:
-            raise RuntimeError("Cannot move unloaded expert to RAM")
-
-        self.data = self.data.to("cpu")
-        self.device = torch.device("cpu")
-        self.current_tier = MemoryTier.RAM
+        if self.data is not None:
+            self.data = self.data.to(TORCH_RAM_DEVICE)
+            self.current_tier = MemoryTier.RAM
 
     def unload(self) -> None:
-        """Unload expert data from memory or gpu"""
+        """Unload expert data from memory."""
         self.data = None
         self.current_tier = MemoryTier.DISK
-        # Note: Keep device preference for future loads
 
     def load_from_nvme_to_ram(self) -> None:
-        """
-        Load expert data from NVMe/disk to RAM.
-
-        Raises:
-            ValueError: If the expert_key is not supported by the adapter
-        """
-        if self.is_loaded:
-            return  # Already loaded, no need to load again
-
-        if self.current_tier != MemoryTier.DISK:
-            return  # Not on disk, cannot load from NVMe
+        """Load expert data from NVMe/disk to RAM."""
+        if self.is_loaded or self.current_tier != MemoryTier.DISK:
+            return
 
         # Load tensor using adapter
         tensor = self.adapter.load_expert_tensor(self.expert_key)
 
         # Place on CPU (RAM)
-        self.data = tensor.to("cpu")
+        self.data = tensor.to(TORCH_RAM_DEVICE)
         self.current_tier = MemoryTier.RAM
 
     def load_from_nvme_to_vram(self) -> None:
-        """
-        Load expert data from NVMe/disk directly to VRAM.
-
-        Raises:
-            RuntimeError: If CUDA not available or expert is already loaded
-            ValueError: If the expert_key is not supported by the adapter
-        """
-        if not torch.cuda.is_available():
-            raise RuntimeError("CUDA not available, cannot load to VRAM")
-
-        if self.is_loaded:
-            return  # Already loaded, no need to load again
-
-        if self.current_tier != MemoryTier.DISK:
-            return  # Not on disk, cannot load from NVMe
+        """Load expert data from NVMe/disk directly to VRAM."""
+        if self.is_loaded or self.current_tier != MemoryTier.DISK:
+            return
 
         # Load tensor using adapter
         tensor = self.adapter.load_expert_tensor(self.expert_key)
 
         # Place on CUDA device (VRAM)
-        cuda_device = "cuda" if self.device is None else self.device
-        self.data = tensor.to(cuda_device)
-        self.device = torch.device(cuda_device)
+        self.data = tensor.to(TORCH_VRAM_DEVICE)
         self.current_tier = MemoryTier.VRAM
 
     def promote_to_upper_tier(self) -> None:
@@ -176,8 +129,8 @@ class Expert:
         """String representation for debugging."""
         loaded_status = "loaded" if self.is_loaded else "unloaded"
         status = f"@{self.current_tier.name}"
-        if self.device:
-            status += f"({self.device})"
+        if self.data is not None:
+            status += f"({self.data.device})"
 
         usage = f"{self.memory_usage() / (1024**2):.1f}MB" if self.is_loaded else "0MB"
 
