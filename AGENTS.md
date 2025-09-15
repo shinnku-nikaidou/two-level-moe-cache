@@ -1,5 +1,28 @@
 # AI Agents Development Notes
 
+## Python Environment Setup
+
+### ⚠️ Virtual Environment Activation
+
+**Before running any Python scripts or commands, make sure to activate the virtual environment:**
+
+```bash
+source .venv/bin/activate
+```
+
+**Common Issue**: If you encounter `zsh: command not found: python`, it means the virtual environment is not activated. Always run the activation command first.
+
+**Correct workflow:**
+
+```bash
+# 1. Activate virtual environment
+source .venv/bin/activate
+
+# 2. Run Python scripts
+python tests/gptoss_cpu_boil.py
+# etc...
+```
+
 ## Model Checkpoint Structure
 
 ### Important: Model Location
@@ -23,7 +46,7 @@ The model checkpoint is stored in:
 
 The parameters in the checkpoint follow this naming pattern:
 
-```
+```text
 embedding.weight
 unembedding.weight
 block.{layer_idx}.attn.norm.scale

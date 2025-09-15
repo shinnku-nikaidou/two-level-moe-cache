@@ -7,11 +7,12 @@ No persistence, no LRU management - maximum simplicity for maximum performance.
 """
 
 import torch
-from typing import Dict, List
+from typing import List, Set
 from src.domain.cache.interfaces.expert_cache import IExpertCacheManager
 from src.domain.cache.entities.expert import Expert
 from src.domain.cache.entities.types import ExpertKey
 from src.domain import ModelType
+
 
 class DirectNVMEExpertCacheManager(IExpertCacheManager):
     """
@@ -25,19 +26,21 @@ class DirectNVMEExpertCacheManager(IExpertCacheManager):
     5. No capacity management or eviction logic
 
     This should be much faster than complex LRU caching for single-token generation.
+    Uses shared expert storage from base class - no duplicate Expert instances.
     """
 
     def __init__(self, model_type: ModelType):
         """
-        Initialize direct VRAM cache.
+        Initialize direct VRAM cache using shared expert storage.
 
         Args:
             model_type: Model type for creating Expert instances
         """
-        self._model_type = model_type
+        # Initialize base class with shared expert storage
+        super().__init__(model_type)
 
-        # Track currently loaded experts for cleanup
-        self._loaded_experts: Dict[ExpertKey, Expert] = {}
+        # Track currently loaded expert keys (not Expert instances)
+        self._loaded_expert_keys: Set[ExpertKey] = set()
 
     def get(self, key: ExpertKey) -> Expert:
         """
@@ -53,13 +56,9 @@ class DirectNVMEExpertCacheManager(IExpertCacheManager):
             KeyError: If expert cannot be loaded
             RuntimeError: If CUDA not available
         """
-        if not torch.cuda.is_available():
-            raise RuntimeError("CUDA not available - DirectVRAMCache requires GPU")
-
-        # Always load fresh - no caching
-        expert = self._load_expert_to_vram(key)
-        self._loaded_experts[key] = expert
-
+        expert = self._get_expert(key)
+        expert.nvme_to_vram()
+        self._loaded_expert_keys.add(key)
         return expert
 
     def get_batch(self, keys: List[ExpertKey]) -> List[Expert]:
@@ -79,8 +78,6 @@ class DirectNVMEExpertCacheManager(IExpertCacheManager):
             KeyError: If any expert cannot be loaded
             RuntimeError: If CUDA not available
         """
-        if not torch.cuda.is_available():
-            raise RuntimeError("CUDA not available - DirectVRAMCache requires GPU")
 
         # AUTO-CLEANUP: Unload all previously loaded experts first
         # This ensures maximum memory efficiency with no manual management needed
@@ -90,8 +87,9 @@ class DirectNVMEExpertCacheManager(IExpertCacheManager):
 
         # Load each expert directly to VRAM in order
         for key in keys:
-            expert = self._load_expert_to_vram(key)
-            self._loaded_experts[key] = expert
+            expert = self._get_expert(key)  # Get pre-created expert
+            expert.nvme_to_vram()  # Load to VRAM
+            self._loaded_expert_keys.add(key)  # Track as loaded
             result.append(expert)
 
         return result
@@ -109,7 +107,7 @@ class DirectNVMEExpertCacheManager(IExpertCacheManager):
         Returns:
             Number of experts unloaded
         """
-        all_keys = list(self._loaded_experts.keys())
+        all_keys = list(self._loaded_expert_keys)
         return self._evict_batch(all_keys)
 
     def _evict(self, key: ExpertKey) -> bool:
@@ -122,11 +120,12 @@ class DirectNVMEExpertCacheManager(IExpertCacheManager):
         Returns:
             True if expert was unloaded, False if not found
         """
-        if key not in self._loaded_experts:
+        if key not in self._loaded_expert_keys:
             return False
 
-        expert = self._loaded_experts.pop(key)
+        expert = self._get_expert(key)
         expert.unload()  # Free VRAM memory
+        self._loaded_expert_keys.remove(key)
 
         return True
 
@@ -146,28 +145,6 @@ class DirectNVMEExpertCacheManager(IExpertCacheManager):
                 unloaded_count += 1
 
         return unloaded_count
-
-    def _load_expert_to_vram(self, key: ExpertKey) -> Expert:
-        """
-        Load an expert directly to VRAM.
-
-        Args:
-            key: Expert identifier to load
-
-        Returns:
-            Expert instance with data loaded in VRAM
-
-        Raises:
-            KeyError: If expert cannot be loaded
-            RuntimeError: If CUDA not available or loading fails
-        """
-        # Create expert instance
-        expert = Expert(expert_key=key, model_type=self._model_type)
-
-        # Load directly to VRAM (bypass RAM completely)
-        expert.nvme_to_vram()
-
-        return expert
 
     def next(self) -> None:
         pass

@@ -33,7 +33,7 @@ class LRUExpertCacheManager(IExpertCacheManager):
         max_ram_experts: int = 32,
     ):
         """
-        Initialize LRU expert cache manager.
+        Initialize LRU expert cache manager with shared expert storage.
 
         Args:
             model_type: Model type for creating Expert instances
@@ -41,11 +41,14 @@ class LRUExpertCacheManager(IExpertCacheManager):
             max_vram_experts: Maximum experts to keep in VRAM before eviction
             max_ram_experts: Maximum experts to keep in RAM before eviction to disk
         """
-        self._experts: OrderedDict[ExpertKey, Expert] = OrderedDict()
+        # Initialize base class with shared expert storage
+        super().__init__(model_type)
+
+        # LRU tracking of accessed experts (using keys, not Expert instances)
+        self._access_order: OrderedDict[ExpertKey, None] = OrderedDict()
         self._tier_manager = memory_tier_manager or SetBasedMemoryTierManager()
         self._max_vram_experts = max_vram_experts
         self._max_ram_experts = max_ram_experts
-        self._model_type = model_type
 
     def get(self, key: ExpertKey) -> Expert:
         """
@@ -60,18 +63,17 @@ class LRUExpertCacheManager(IExpertCacheManager):
         Raises:
             KeyError: If expert cannot be loaded
         """
-        if key in self._experts:
-            # Cache hit: move to end (most recently used)
-            expert = self._experts.pop(key)
-            self._experts[key] = expert
+        # Get pre-created expert from shared storage
+        expert = self._get_expert(key)
 
-            # Ensure expert is in appropriate tier
-            self._ensure_expert_tier(key, expert)
-            return expert
+        # Update LRU access order
+        if key in self._access_order:
+            # Move to end (most recently used)
+            del self._access_order[key]
+        self._access_order[key] = None
 
-        # Cache miss: load expert
-        expert = self._load_expert(key)
-        self._put(key, expert)
+        # Ensure expert is in appropriate tier
+        self._ensure_expert_tier(key, expert)
         return expert
 
     def get_batch(self, keys: List[ExpertKey]) -> List[Expert]:
@@ -92,26 +94,19 @@ class LRUExpertCacheManager(IExpertCacheManager):
         """
         result = []
         experts_dict = {}
-        missing_keys = []
 
-        # Collect cached experts and identify missing ones
+        # Get all experts from shared storage and update LRU order
         for key in keys:
-            if key in self._experts:
-                expert = self._experts.pop(key)
-                self._experts[key] = expert  # Move to end (LRU)
-
-                # Store in dict for device consistency check
-                experts_dict[key] = expert
-
-                self._ensure_expert_tier(key, expert)
-            else:
-                missing_keys.append(key)
-
-        # Load missing experts in batch
-        for key in missing_keys:
-            expert = self._load_expert(key)
-            self._put(key, expert)
+            expert = self._get_expert(key)
             experts_dict[key] = expert
+
+            # Update LRU access order
+            if key in self._access_order:
+                del self._access_order[key]
+            self._access_order[key] = None
+
+            # Ensure expert is in appropriate tier
+            self._ensure_expert_tier(key, expert)
 
         # IMPORTANT: Ensure all experts in batch are on same device for consistency
         self._ensure_batch_device_consistency(experts_dict)
@@ -126,23 +121,23 @@ class LRUExpertCacheManager(IExpertCacheManager):
         """
         Clear all experts from the cache.
         """
-        # Clear experts
-        self._experts.clear()
+        # Clear LRU access order tracking
+        self._access_order.clear()
+        # Note: Don't clear self._experts as they are shared from base class
 
     def _put(self, key: ExpertKey, expert: Expert) -> None:
         """
-        Internal method to store an expert in the cache with LRU eviction.
+        Internal method to track expert access in LRU order.
+        Note: Expert instances are managed by base class, this only tracks access.
 
         Args:
             key: Expert identifier
-            expert: Expert instance to store
+            expert: Expert instance (for tier management)
         """
-        # Remove if already exists (for re-insertion at end)
-        if key in self._experts:
-            del self._experts[key]
-
-        # Add expert to cache
-        self._experts[key] = expert
+        # Update LRU access order
+        if key in self._access_order:
+            del self._access_order[key]
+        self._access_order[key] = None
 
         # Update tier tracking
         current_tier = expert.current_tier
@@ -154,18 +149,23 @@ class LRUExpertCacheManager(IExpertCacheManager):
 
     def _evict(self, key: ExpertKey) -> bool:
         """
-        Internal method to remove an expert from the cache.
+        Internal method to remove an expert from LRU tracking.
+        Note: Expert data is managed by base class, this only removes LRU tracking.
 
         Args:
-            key: Expert identifier to evict
+            key: Expert identifier to evict from LRU tracking
 
         Returns:
-            True if expert was evicted, False if not found
+            True if expert was evicted from tracking, False if not found
         """
-        if key not in self._experts:
+        if key not in self._access_order:
             return False
 
-        expert = self._experts.pop(key)
+        # Remove from LRU access tracking
+        del self._access_order[key]
+
+        # Get expert for tier management
+        expert = self._get_expert(key)
 
         # Remove from tier tracking
         current_tier = self._tier_manager.get_tier(key)
@@ -218,16 +218,23 @@ class LRUExpertCacheManager(IExpertCacheManager):
         current_tier = expert.current_tier
         vram_count = self._tier_manager.get_tier_size(MemoryTier.VRAM)
 
+        # If expert is not loaded anywhere, load to RAM first
+        if current_tier is None:
+            expert.nvme_to_ram()  # Load from disk to RAM first
+            current_tier = MemoryTier.RAM
+            self._tier_manager.add_to_tier(MemoryTier.RAM, key)
+
         # Promote to VRAM if there's space and not already there
         if current_tier != MemoryTier.VRAM and vram_count < self._max_vram_experts:
-            if current_tier:
+            if current_tier == MemoryTier.RAM:
                 self._tier_manager.move_between_tiers(
-                    key, current_tier, MemoryTier.VRAM
+                    key, MemoryTier.RAM, MemoryTier.VRAM
                 )
-            else:
+                expert.ram_to_vram()  # Promote to VRAM
+            elif current_tier == MemoryTier.DISK:
+                # Load directly to VRAM if there's space
                 self._tier_manager.add_to_tier(MemoryTier.VRAM, key)
-
-            expert.ram_to_vram()  # Promote to VRAM
+                expert.nvme_to_vram()  # Load directly to VRAM
 
     def _enforce_capacity_limits(self) -> None:
         """
@@ -244,18 +251,17 @@ class LRUExpertCacheManager(IExpertCacheManager):
 
             # Find least recently used experts in VRAM
             lru_experts = []
-            for key in reversed(list(self._experts.keys())):  # LRU order
+            for key in reversed(list(self._access_order.keys())):  # LRU order
                 if key in vram_experts and len(lru_experts) < experts_to_demote:
                     lru_experts.append(key)
 
             # Move to RAM
             for key in lru_experts:
-                if key in self._experts:
-                    expert = self._experts[key]
-                    expert.vram_to_ram()
-                    self._tier_manager.move_between_tiers(
-                        key, MemoryTier.VRAM, MemoryTier.RAM
-                    )
+                expert = self._get_expert(key)
+                expert.vram_to_ram()
+                self._tier_manager.move_between_tiers(
+                    key, MemoryTier.VRAM, MemoryTier.RAM
+                )
 
         # Evict from RAM to DISK if over limit
         if ram_count > self._max_ram_experts:
@@ -264,7 +270,7 @@ class LRUExpertCacheManager(IExpertCacheManager):
 
             # Find least recently used experts in RAM
             lru_experts = []
-            for key in reversed(list(self._experts.keys())):  # LRU order
+            for key in reversed(list(self._access_order.keys())):  # LRU order
                 if key in ram_experts and len(lru_experts) < experts_to_evict:
                     lru_experts.append(key)
 
@@ -293,10 +299,17 @@ class LRUExpertCacheManager(IExpertCacheManager):
 
         # Check and fix device for each expert
         for key, expert in expert_dict.items():
-            if expert.data is None:
+            # Check if expert has data loaded anywhere
+            if expert.data_vram is None and expert.data_ram is None:
                 continue  # Skip unloaded experts
 
-            current_device_str = str(expert.data.device)
+            # Determine current data location and device
+            if expert.data_vram is not None:
+                current_device_str = str(expert.data_vram.device)
+            elif expert.data_ram is not None:
+                current_device_str = str(expert.data_ram.device)
+            else:
+                continue
 
             # If expert is not on target device, promote it
             if current_device_str != target_device:
@@ -336,7 +349,6 @@ class LRUExpertCacheManager(IExpertCacheManager):
                         )
                     else:
                         self._tier_manager.add_to_tier(MemoryTier.RAM, key)
-                        
+
     def next(self) -> None:
         pass
-
