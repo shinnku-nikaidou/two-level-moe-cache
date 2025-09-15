@@ -2,13 +2,57 @@
 Core entities for expert weight caching system.
 """
 
+import os
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Union
+from typing import Optional, Union, TYPE_CHECKING
 import torch
 
 from src.domain import ModelType
+from src.adapters.expert.factory import AdapterFactory
+
+if TYPE_CHECKING:
+    from src.adapters.expert.base import ExpertAdapter
+
+
+def get_checkpoint_path(model_type: ModelType) -> str:
+    """
+    Get the checkpoint path for a given model type.
+    
+    Args:
+        model_type: The model type to get the checkpoint path for
+        
+    Returns:
+        str: The path to the model checkpoint directory
+        
+    Raises:
+        ValueError: If the model type is not supported or path doesn't exist
+    """
+    # Base models directory
+    base_dir = "data/models"
+    
+    # Map model types to their directory names
+    model_path_map = {
+        ModelType.GPT_OSS_20B: "gpt-oss-20b/original/",
+        ModelType.GPT_OSS_120B: "gpt-oss-120b/original/", 
+        ModelType.PHI_TINY_MOE: "phi-tiny-moe/original/",
+    }
+    
+    if model_type not in model_path_map:
+        supported_models = list(model_path_map.keys())
+        raise ValueError(
+            f"Unsupported model type: {model_type}. "
+            f"Supported models: {[m.value for m in supported_models]}"
+        )
+    
+    checkpoint_path = os.path.join(base_dir, model_path_map[model_type])
+    
+    # Verify the path exists
+    if not os.path.exists(checkpoint_path):
+        raise ValueError(f"Checkpoint path does not exist: {checkpoint_path}")
+    
+    return checkpoint_path
 
 
 class MemoryTier(Enum):
@@ -45,7 +89,7 @@ class Expert:
     def __init__(
         self,
         expert_key: ExpertKey,
-        model: ModelType,
+        model_type: ModelType,
         current_tier: MemoryTier = MemoryTier.DISK,
         data: Optional[torch.Tensor] = None,
         device: Optional[Union[str, torch.device]] = None,
@@ -55,14 +99,28 @@ class Expert:
 
         Args:
             expert_key: Unique identifier for this expert weight
+            model_type: The model type this expert belongs to
             current_tier: Current memory tier where data is stored
             data: The actual tensor data (None means not loaded)
             device: Device where the tensor should be placed when loaded
         """
         self.expert_key = expert_key
+        self.model_type = model_type
         self.current_tier = current_tier
         self._data: Optional[torch.Tensor] = data
         self.device = torch.device(device) if device else None
+        self.last_access_time = time.time()
+        self.access_count = 0
+        
+        # Create adapter immediately based on model_type
+        
+        checkpoint_path = get_checkpoint_path(self.model_type)
+        self._adapter: 'ExpertAdapter' = AdapterFactory.create_adapter(self.model_type, checkpoint_path)
+
+    @property
+    def adapter(self) -> 'ExpertAdapter':
+        """Get the expert adapter."""
+        return self._adapter
 
     @property
     def data(self) -> Optional[torch.Tensor]:
@@ -89,19 +147,62 @@ class Expert:
         return self._data.numel() * self._data.element_size()
 
     def load_from_nvme_to_ram(self) -> None:
-        pass
+        """
+        Load expert data from NVMe/disk to RAM.
+        
+        Raises:
+            ValueError: If the expert_key is not supported by the adapter
+        """
+        if self.is_loaded:
+            return  # Already loaded, no need to load again
+        
+        if self.current_tier != MemoryTier.DISK:
+            return  # Not on disk, cannot load from NVMe
+        
+        # Load tensor using adapter
+        tensor = self.adapter.load_expert_tensor(self.expert_key)
+        
+        # Place on CPU (RAM)
+        self.data = tensor.to("cpu")
+        self.current_tier = MemoryTier.RAM
     
     def load_from_nvme_to_vram(self) -> None:
-        pass
+        """
+        Load expert data from NVMe/disk directly to VRAM.
+        
+        Raises:
+            RuntimeError: If CUDA not available or expert is already loaded
+            ValueError: If the expert_key is not supported by the adapter
+        """
+        if not torch.cuda.is_available():
+            raise RuntimeError("CUDA not available, cannot load to VRAM")
+        
+        if self.is_loaded:
+            return  # Already loaded, no need to load again
+        
+        if self.current_tier != MemoryTier.DISK:
+            return  # Not on disk, cannot load from NVMe
+        
+        # Load tensor using adapter
+        tensor = self.adapter.load_expert_tensor(self.expert_key)
+        
+        # Place on CUDA device (VRAM)
+        cuda_device = "cuda" if self.device is None else self.device
+        self.data = tensor.to(cuda_device)
+        self.device = torch.device(cuda_device)
+        self.current_tier = MemoryTier.VRAM
 
     def self_promote(self) -> None:
+        """Promote to the next higher memory tier."""
         match self.current_tier:
             case MemoryTier.DISK:
-                self.load_from_nvme()
+                self.load_from_nvme_to_ram()
                 self.current_tier = MemoryTier.RAM
             case MemoryTier.RAM:
-                if self.device and self._data is not None:
-                    self._data = self._data.to(self.device)
+                if self._data is not None and torch.cuda.is_available():
+                    cuda_device = "cuda" if self.device is None else self.device
+                    self._data = self._data.to(cuda_device)
+                    self.device = torch.device(cuda_device)
                     self.current_tier = MemoryTier.VRAM
             case MemoryTier.VRAM:
                 pass  # Already at highest tier
