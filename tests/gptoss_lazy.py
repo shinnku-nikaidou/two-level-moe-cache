@@ -12,6 +12,7 @@ project_root = os.path.dirname(current_dir)
 sys.path.insert(0, project_root)
 
 from src.domain.gpt_oss.model import LazyTransformer
+from src.domain import ModelType
 from src.boilerplate.gpt_oss.tokenizer import get_tokenizer
 
 MODEL_PATH = os.path.join(project_root, "data", "models", "gpt-oss-20b", "original")
@@ -21,13 +22,13 @@ class LazyTokenGenerator:
     """LazyTransformer version of TokenGenerator"""
 
     @torch.inference_mode()
-    def __init__(self, checkpoint_dir: str, device: torch.device):
+    def __init__(self, model_type: ModelType, device: torch.device):
         self.device = device
-        self.model = self._load_lazy_model(checkpoint_dir)
+        self.model = self._load_lazy_model(model_type)
 
-    def _load_lazy_model(self, checkpoint_dir: str) -> LazyTransformer:
+    def _load_lazy_model(self, model_type: ModelType) -> LazyTransformer:
         """Load LazyTransformer with lazy expert loading"""
-        model = LazyTransformer.from_checkpoint(checkpoint_dir, device=self.device)
+        model = LazyTransformer.from_model_type(model_type, device=self.device)
         model.eval()
         return model
 
@@ -87,7 +88,7 @@ def test_basic_functionality():
     print(f"Using device: {device}")
 
     # Load LazyTransformer with specified device
-    model = LazyTransformer.from_checkpoint(MODEL_PATH, device=device)
+    model = LazyTransformer.from_model_type(ModelType.GPT_OSS_20B, device=device)
     print("LazyTransformer loaded successfully")
 
     # Get tokenizer
@@ -141,7 +142,7 @@ def test_lazy_generation():
     print(f"Using device: {device}")
 
     # Load LazyTransformer
-    generator = LazyTokenGenerator(MODEL_PATH, device=device)
+    generator = LazyTokenGenerator(ModelType.GPT_OSS_20B, device=device)
 
     # Get tokenizer
     tokenizer = get_tokenizer()

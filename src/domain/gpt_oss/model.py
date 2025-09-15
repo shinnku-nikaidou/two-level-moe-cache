@@ -17,6 +17,7 @@ from ...boilerplate.gpt_oss.model import (
 from ...boilerplate.gpt_oss.weights import Checkpoint
 from ..cache.interfaces.expert_cache import IExpertCache
 from ...services.cache import ExpertCacheFactory
+from ...config.util import get_checkpoint_path
 from ...domain import ModelType
 from .moe import LazyMLPBlock
 
@@ -72,8 +73,7 @@ class LazyTransformer(torch.nn.Module):
     def __init__(
         self,
         config: ModelConfig,
-        checkpoint_path: str | None = None,
-        expert_cache: IExpertCache | None = None,
+        model_type: ModelType,
         device: torch.device | None = None,
     ):
         """
@@ -81,32 +81,18 @@ class LazyTransformer(torch.nn.Module):
 
         Args:
             config: Model configuration
-            checkpoint_path: Path to checkpoint directory (used if expert_cache is None)
-            expert_cache: Pre-configured expert cache (creates default if None)
+            model_type: Model type for automatic checkpoint path resolution
             device: Target device for components
         """
         super().__init__()
         self.config = config
 
-        # Create expert cache if not provided
-        if expert_cache is None:
-            if checkpoint_path is None:
-                raise ValueError(
-                    "Either expert_cache or checkpoint_path must be provided"
-                )
-
-            # Ensure we have directory path for Checkpoint class
-
-            # Auto-detect model type from checkpoint path
-            model_type = self._detect_model_type(checkpoint_path)
-
-            # Create simple DirectVRAM cache for maximum performance
-            # This implements "use-and-delete" strategy - no complex LRU management
-            self.expert_cache = ExpertCacheFactory.create_direct_vram_cache(
-                model_type=model_type,
-            )
-        else:
-            self.expert_cache = expert_cache
+        # Create expert cache using model_type (no external dependencies needed)
+        # Create simple DirectVRAM cache for maximum performance
+        # This implements "use-and-delete" strategy - no complex LRU management
+        self.expert_cache = ExpertCacheFactory.create_direct_vram_cache(
+            model_type=model_type,
+        )
 
         # Standard components with specified device
         self.embedding = torch.nn.Embedding(
@@ -132,28 +118,6 @@ class LazyTransformer(torch.nn.Module):
             device=device,
         )
 
-    def _detect_model_type(self, checkpoint_path: str) -> ModelType:
-        """
-        Detect model type from checkpoint path.
-
-        Args:
-            checkpoint_path: Path to checkpoint directory
-
-        Returns:
-            Detected model type
-        """
-        checkpoint_path_lower = checkpoint_path.lower()
-
-        if "gpt-oss-20b" in checkpoint_path_lower:
-            return ModelType.GPT_OSS_20B
-        elif "gpt-oss-120b" in checkpoint_path_lower:
-            return ModelType.GPT_OSS_120B
-        elif "phi-tiny-moe" in checkpoint_path_lower:
-            return ModelType.PHI_TINY_MOE
-        else:
-            # Default to 20B model if cannot detect
-            return ModelType.GPT_OSS_20B
-
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through the lazy transformer."""
         # Components should already be on the correct device from initialization
@@ -165,14 +129,14 @@ class LazyTransformer(torch.nn.Module):
         return x
 
     @staticmethod
-    def from_checkpoint(
-        checkpoint_dir: str, device: str | torch.device
+    def from_model_type(
+        model_type: ModelType, device: str | torch.device
     ) -> "LazyTransformer":
         """
-        Load transformer from checkpoint with lazy loading.
+        Load transformer from model type with lazy loading.
 
         Args:
-            path: Path to checkpoint directory or file
+            model_type: Model type for automatic checkpoint path and config resolution
             device: Target device
 
         Returns:
@@ -181,13 +145,17 @@ class LazyTransformer(torch.nn.Module):
         if not isinstance(device, torch.device):
             device = torch.device(device)
 
+        # Auto-resolve checkpoint directory from model type
+
+        checkpoint_dir = get_checkpoint_path(model_type)
+
         config_path = os.path.join(checkpoint_dir, "config.json")
         with open(config_path, "r") as f:
             json_config = json.load(f)
             model_config = ModelConfig(**json_config)
 
         model = LazyTransformer(
-            config=model_config, checkpoint_path=checkpoint_dir, device=device
+            config=model_config, model_type=model_type, device=device
         )
         model.eval()
 
@@ -220,16 +188,16 @@ class LazyTokenGenerator:
     """
 
     @torch.inference_mode()
-    def __init__(self, checkpoint: str, device: torch.device):
+    def __init__(self, model_type: ModelType, device: torch.device):
         """
         Initialize lazy token generator.
 
         Args:
-            checkpoint: Path to checkpoint directory
+            model_type: Model type for automatic checkpoint resolution
             device: Target device for inference
         """
         self.device = device
-        self.model = LazyTransformer.from_checkpoint(checkpoint, device=device)
+        self.model = LazyTransformer.from_model_type(model_type, device=device)
         # Move model to device after creation
         self.model = self.model.to(device)
 
