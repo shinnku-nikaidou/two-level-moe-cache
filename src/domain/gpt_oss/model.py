@@ -106,11 +106,10 @@ class LazyTransformer(torch.nn.Module):
             # Create cache configuration optimized for the model
             cache_config = CacheConfig.for_model(model_type)
 
-            # Create expert cache using factory
-            self.expert_cache = ExpertCacheFactory.create_lru_cache(
+            # Create simple DirectVRAM cache for maximum performance
+            # This implements "use-and-delete" strategy - no complex LRU management
+            self.expert_cache = ExpertCacheFactory.create_direct_vram_cache(
                 model_type=model_type,
-                config=cache_config,
-                checkpoint_path=checkpoint_dir,  # Pass directory path
             )
         else:
             self.expert_cache = expert_cache

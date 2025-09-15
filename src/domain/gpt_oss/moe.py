@@ -10,6 +10,7 @@ import torch.distributed as dist
 
 from ...boilerplate.gpt_oss.model import ModelConfig, swiglu, RMSNorm
 from ..cache.interfaces.expert_cache import IExpertCache
+from ..cache.entities.types import ExpertKey
 from .lazy_tensor import LazyExpertTensor
 
 

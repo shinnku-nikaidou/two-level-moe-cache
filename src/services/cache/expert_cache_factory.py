@@ -9,7 +9,8 @@ from typing import Optional, Dict, Any
 from ...config.cache_config import CacheConfig
 from ...domain.cache.interfaces.expert_cache import IExpertCache
 from ...domain.cache.interfaces.memory_tier import IMemoryTierManager
-from ...domain.manager.expert_cache import LRUExpertCacheManager
+from ...domain.manager.lru_expert_cache import LRUExpertCacheManager
+from ...domain.manager.direct_vram_cache import DirectVRAMExpertCache
 from ...domain.manager.memory_tier import SetBasedMemoryTierManager
 from ...domain import ModelType
 
@@ -25,6 +26,7 @@ class ExpertCacheFactory:
     # Registry of available cache implementations
     _cache_implementations: Dict[str, type] = {
         "lru": LRUExpertCacheManager,
+        "direct_vram": DirectVRAMExpertCache,  # Simple use-and-delete cache
         # Future implementations can be added here:
         # "lfu": LFUExpertCacheManager,
         # "adaptive": AdaptiveExpertCacheManager,
@@ -78,6 +80,28 @@ class ExpertCacheFactory:
             max_ram_experts=config.max_ram_experts,
             # Don't pass checkpoint_path to the cache manager
         )
+
+    @classmethod
+    def create_direct_vram_cache(
+        cls,
+        model_type: ModelType,
+        **kwargs,
+    ) -> IExpertCache:
+        """
+        Create a direct VRAM cache for use-and-delete strategy.
+
+        This creates the simplest possible cache that loads experts directly
+        to VRAM and unloads them immediately after use. No capacity management,
+        no LRU tracking - maximum simplicity for maximum performance.
+
+        Args:
+            model_type: Type of model for expert loading
+            **kwargs: Additional arguments (ignored for simplicity)
+
+        Returns:
+            Direct VRAM expert cache
+        """
+        return DirectVRAMExpertCache(model_type=model_type)
 
     @classmethod
     def create_cache(
@@ -138,6 +162,9 @@ class ExpertCacheFactory:
                 max_ram_experts=config.max_ram_experts,
                 **kwargs,
             )
+        elif cache_type == "direct_vram":
+            # DirectVRAM cache doesn't need tier manager or capacity limits
+            return cache_class(model_type=model_type, **kwargs)
         else:
             # Generic creation - may need adjustment for future implementations
             return cache_class(

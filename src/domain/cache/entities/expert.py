@@ -65,8 +65,6 @@ class Expert:
         expert_key: ExpertKey,
         model_type: ModelType,
         current_tier: MemoryTier = MemoryTier.DISK,
-        data: Optional[torch.Tensor] = None,
-        device: Optional[Union[str, torch.device]] = None,
     ):
         """
         Initialize expert weight data.
@@ -74,14 +72,12 @@ class Expert:
         Args:
             expert_key: Unique identifier for this expert weight
             model_type: The model type this expert belongs to
-            current_tier: Current memory tier where data is stored
-            data: The actual tensor data (None means not loaded)
-            device: Target device for VRAM storage
+            current_tier: Current memory tier where data is stored (default: DISK)
         """
         self.expert_key = expert_key
         self.current_tier = current_tier
-        self.data = data
-        self.device = torch.device(device) if device else None
+        self.data: Optional[torch.Tensor] = None  # Always start unloaded
+        self.device: Optional[torch.device] = None  # Will be set when loading to specific tier
 
         # Access tracking
         self.last_access_time = time.time()
