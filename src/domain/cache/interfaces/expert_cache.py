@@ -6,19 +6,97 @@ with automatic memory management and tier coordination.
 """
 
 from abc import ABC, abstractmethod
-from typing import List
+from typing import Dict, List
 from ..entities.expert import Expert
-from ..entities.types import ExpertKey
+from ..entities.types import ExpertKey, ExpertParamType
+from src.domain import ModelType
+from src.boilerplate.gpt_oss.model import ModelConfig
 
 
 class IExpertCacheManager(ABC):
     """
     High-level interface for expert weight retrieval system.
 
-    This interface focuses on the primary use case: efficiently retrieving
-    expert weights for inference. Internal cache management details like
-    eviction policies and memory tier coordination are implementation-specific.
+    This base class provides common expert storage and management,
+    while subclasses implement specific caching policies and strategies.
     """
+
+    def __init__(self, model_type: ModelType):
+        """
+        Initialize expert cache manager with pre-created expert instances.
+
+        Args:
+            model_type: Model type for creating Expert instances
+        """
+        super().__init__()
+        self._model_type = model_type
+
+        # Get model configuration - for now hardcoded to GPT-OSS default
+        # TODO: Make this configurable per model_type in future
+        self._config = ModelConfig()
+
+        # Pre-create all possible Expert instances based on model configuration
+        self._experts: Dict[ExpertKey, Expert] = self._create_all_experts()
+
+    def _create_all_experts(self) -> Dict[ExpertKey, Expert]:
+        """
+        Pre-create all Expert instances based on model configuration.
+
+        This eliminates duplicate Expert creation across different cache implementations.
+
+        Returns:
+            Dictionary mapping ExpertKey to Expert instances
+        """
+        experts = {}
+
+        # All parameter types for each expert
+        param_types = [
+            ExpertParamType.MLP1_WEIGHT,
+            ExpertParamType.MLP1_BIAS,
+            ExpertParamType.MLP2_WEIGHT,
+            ExpertParamType.MLP2_BIAS,
+        ]
+
+        # Generate all possible expert keys
+        for layer_idx in range(self._config.num_hidden_layers):
+            for expert_id in range(self._config.num_experts):
+                for param_type in param_types:
+                    key = ExpertKey(
+                        layer_idx=layer_idx, expert_id=expert_id, param_type=param_type
+                    )
+                    # Create Expert instance (unloaded state)
+                    experts[key] = Expert(expert_key=key, model_type=self._model_type)
+
+        return experts
+
+    def _get_expert(self, key: ExpertKey) -> Expert:
+        """
+        Get pre-created Expert instance by key.
+
+        Args:
+            key: Expert identifier
+
+        Returns:
+            Expert instance
+
+        Raises:
+            KeyError: If expert key is not valid for this model
+        """
+        if key not in self._experts:
+            raise KeyError(f"Expert key not found: {key}")
+        return self._experts[key]
+
+    def get_total_expert_count(self) -> int:
+        """Get total number of expert instances managed by this cache."""
+        return len(self._experts)
+
+    def get_loaded_expert_count(self) -> int:
+        """Get number of experts currently loaded in memory."""
+        return sum(1 for expert in self._experts.values() if expert.is_loaded)
+
+    def get_vram_expert_count(self) -> int:
+        """Get number of experts currently in VRAM."""
+        return sum(1 for expert in self._experts.values() if expert.is_in_vram)
 
     @abstractmethod
     def get(self, key: ExpertKey) -> Expert:
@@ -34,7 +112,7 @@ class IExpertCacheManager(ABC):
         Raises:
             KeyError: If expert cannot be loaded
         """
-        pass
+        self._get_expert(key)
 
     @abstractmethod
     def get_batch(self, keys: List[ExpertKey]) -> List[Expert]:
@@ -56,11 +134,11 @@ class IExpertCacheManager(ABC):
     def clear(self) -> None:
         """
         Clear all experts from the cache.
-        
+
         Useful for cleanup at end of generation or error recovery.
         """
         pass
-    
+
     @abstractmethod
     def next(self) -> None:
         """

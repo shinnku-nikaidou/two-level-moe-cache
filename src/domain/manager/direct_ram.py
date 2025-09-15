@@ -7,7 +7,6 @@ experts will be in RAM providing fast access with no loading delays.
 RAM is assumed to be "unlimited" - no eviction, just keep accumulating.
 """
 
-import torch
 from typing import Dict, List
 from src.domain.cache.interfaces.expert_cache import IExpertCacheManager
 from src.domain.cache.entities.expert import Expert
@@ -36,10 +35,11 @@ class DirectRAMExpertCacheManager(IExpertCacheManager):
         Args:
             model_type: Model type for creating Expert instances
         """
-        self._model_type = model_type
+        # Call ABC constructor which pre-creates all experts
+        super().__init__(model_type)
 
-        # Persistent cache - experts stay here once loaded
-        self._cached_experts: Dict[ExpertKey, Expert] = {}
+        # Only track which experts have been loaded to RAM
+        self._loaded_keys: set[ExpertKey] = set()
 
     def get(self, key: ExpertKey) -> Expert:
         """
@@ -54,13 +54,14 @@ class DirectRAMExpertCacheManager(IExpertCacheManager):
         Raises:
             KeyError: If expert cannot be loaded
         """
-        # Check if already cached in RAM
-        if key in self._cached_experts:
-            return self._cached_experts[key]
+        # Get pre-created expert instance (no duplicate creation!)
+        expert = self._get_expert(key)
 
-        # Not cached - load to RAM and cache it
-        expert = self._load_expert_to_ram(key)
-        self._cached_experts[key] = expert
+        # Load to RAM if not already loaded
+        if key not in self._loaded_keys:
+            expert.nvme_to_ram()
+            self._loaded_keys.add(key)
+
         return expert
 
     def get_batch(self, keys: List[ExpertKey]) -> List[Expert]:
@@ -83,14 +84,7 @@ class DirectRAMExpertCacheManager(IExpertCacheManager):
 
         # Process each expert: use cached or load fresh
         for key in keys:
-            if key in self._cached_experts:
-                # Cache hit - use existing RAM expert
-                expert = self._cached_experts[key]
-            else:
-                # Cache miss - load to RAM and cache
-                expert = self._load_expert_to_ram(key)
-                self._cached_experts[key] = expert
-
+            expert = self.get(key)  # Reuse single-expert logic
             result.append(expert)
 
         return result
@@ -101,27 +95,28 @@ class DirectRAMExpertCacheManager(IExpertCacheManager):
 
         Note: This defeats the warmup purpose, use sparingly!
         """
-        for expert in self._cached_experts.values():
+        # Unload all loaded experts
+        for key in self._loaded_keys:
+            expert = self._experts[key]  # Use pre-created instance
             expert.unload()
-        self._cached_experts.clear()
+        self._loaded_keys.clear()
 
-    def _load_expert_to_ram(self, key: ExpertKey) -> Expert:
+    def next(self) -> None:
+        """No-op for persistent cache - no time-based policies."""
+        pass
+
+    def get_cache_status(self) -> Dict[str, int]:
         """
-        Load an expert directly to RAM.
-
-        Args:
-            key: Expert identifier to load
+        Get cache status for monitoring warmup progress.
 
         Returns:
-            Expert instance with data loaded in RAM
-
-        Raises:
-            KeyError: If expert cannot be loaded
+            Dictionary with cache statistics
         """
-        # Create expert instance
-        expert = Expert(expert_key=key, model_type=self._model_type)
+        memory_mb = 0
+        for key in self._loaded_keys:
+            expert = self._experts[key]
+            if expert.data_ram is not None:
+                memory_mb += expert.data_ram.numel() * expert.data_ram.element_size()
+        memory_mb = memory_mb // (1024 * 1024)
 
-        # Load to RAM (not VRAM)
-        expert.nvme_to_ram()
-
-        return expert
+        return {"cached_experts": len(self._loaded_keys), "memory_mb": memory_mb}
