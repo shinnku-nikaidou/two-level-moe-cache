@@ -89,19 +89,9 @@ class GPTOSSExpertAdapter(ExpertAdapter):
     def _extract_expert_slice(
         self, full_tensor: torch.Tensor, expert_key: ExpertKey
     ) -> torch.Tensor:
-        """
-        Extract a specific expert from the full tensor.
-
-        Args:
-            full_tensor: The complete tensor containing all experts
-            expert_key: The expert key identifying which slice to extract
-
-        Returns:
-            torch.Tensor: The tensor slice for the specific expert
-        """
         expert_id = expert_key.expert_id
 
         if "weight" in expert_key.param_type.value:
-            return full_tensor[expert_id, ...]
+            return full_tensor[expert_id, ...].clone()
         else:
-            return full_tensor[expert_id, :]
+            return full_tensor[expert_id, :].clone()

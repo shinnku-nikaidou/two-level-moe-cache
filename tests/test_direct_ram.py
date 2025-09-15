@@ -16,19 +16,29 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.domain.manager.direct_ram import DirectRAMExpertCacheManager
 from src.services.cache.expert_cache_factory import ExpertCacheFactory
 from src.domain import ModelType
-from src.domain.cache.entities.types import ExpertKey, ExpertParamType, MemoryTier
+from src.domain.cache.entities.types import ExpertKey, ExpertParamType
+
+# Global cache instance - shared across all tests to avoid multiple pre-warming
+_shared_cache = None
+
+
+def get_shared_cache():
+    """Get or create shared DirectRAM cache instance."""
+    global _shared_cache
+    if _shared_cache is None:
+        print(
+            "🔥 Creating shared DirectRAM cache (this will take time for pre-warming)..."
+        )
+        _shared_cache = DirectRAMExpertCacheManager(ModelType.GPT_OSS_20B)
+        print("✅ Shared cache created and pre-warmed!")
+    return _shared_cache
 
 
 def test_direct_ram_prewarming():
     """Test DirectRAM pre-warming behavior during initialization."""
-    
-    print("=" * 60)
-    print("🔥 Testing DirectRAM Pre-warming Initialization")
-    print("=" * 60)
 
-    # Create DirectRAM cache - this should trigger pre-warming
-    print("Creating DirectRAM cache (this will take time for pre-warming)...")
-    cache = DirectRAMExpertCacheManager(ModelType.GPT_OSS_20B)
+    # Use shared cache instance
+    cache = get_shared_cache()
 
     # Verify all experts are pre-loaded to RAM
     total_experts = cache.get_total_expert_count()
@@ -57,12 +67,12 @@ def test_direct_ram_prewarming():
 
 def test_direct_ram_get_behavior():
     """Test that get() returns VRAM experts from RAM cache."""
-    
-    print("\n" + "=" * 60) 
+
+    print("\n" + "=" * 60)
     print("🚀 Testing DirectRAM get() Behavior")
     print("=" * 60)
 
-    cache = DirectRAMExpertCacheManager(ModelType.GPT_OSS_20B)
+    cache = get_shared_cache()
 
     # Test single expert retrieval
     test_key = ExpertKey(
@@ -73,7 +83,7 @@ def test_direct_ram_get_behavior():
 
     try:
         expert = cache.get(test_key)
-        
+
         print(f"✅ Retrieved expert: {expert}")
         print(f"   Current tier: {expert.current_tier}")
         print(f"   Is in VRAM: {expert.is_in_vram}")
@@ -103,12 +113,12 @@ def test_direct_ram_get_behavior():
 
 def test_direct_ram_batch_behavior():
     """Test that get_batch() returns VRAM experts efficiently."""
-    
+
     print("\n" + "=" * 60)
-    print("📦 Testing DirectRAM get_batch() Behavior") 
+    print("📦 Testing DirectRAM get_batch() Behavior")
     print("=" * 60)
 
-    cache = DirectRAMExpertCacheManager(ModelType.GPT_OSS_20B)
+    cache = get_shared_cache()
 
     # Test batch retrieval
     test_keys = [
@@ -120,17 +130,19 @@ def test_direct_ram_batch_behavior():
 
     try:
         experts = cache.get_batch(test_keys)
-        
+
         print(f"✅ Retrieved {len(experts)} experts in batch")
-        
+
         # Verify all experts are in VRAM
         vram_count = 0
         ram_count = 0
         for i, expert in enumerate(experts):
-            print(f"   Expert {i}: tier={expert.current_tier}, "
-                  f"RAM={expert.data_ram is not None}, "
-                  f"VRAM={expert.data_vram is not None}")
-            
+            print(
+                f"   Expert {i}: tier={expert.current_tier}, "
+                f"RAM={expert.data_ram is not None}, "
+                f"VRAM={expert.data_vram is not None}"
+            )
+
             if expert.is_in_vram:
                 vram_count += 1
             if expert.data_ram is not None:
@@ -162,7 +174,7 @@ def test_direct_ram_memory_efficiency():
     print("🧠 Testing DirectRAM Memory Management")
     print("=" * 60)
 
-    cache = DirectRAMExpertCacheManager(ModelType.GPT_OSS_20B)
+    cache = get_shared_cache()
 
     # Get initial state
     initial_vram = cache.get_vram_expert_count()
@@ -208,7 +220,7 @@ def test_direct_ram_memory_efficiency():
 
 def test_direct_ram_factory():
     """Test DirectRAM creation through factory."""
-    
+
     print("\n" + "=" * 60)
     print("🏭 Testing DirectRAM Factory Creation")
     print("=" * 60)
@@ -217,9 +229,9 @@ def test_direct_ram_factory():
         cache = ExpertCacheFactory.create_direct_ram_cache_manager(
             ModelType.GPT_OSS_20B
         )
-        
+
         print(f"✅ Factory created DirectRAM cache: {type(cache).__name__}")
-        
+
         # Verify it's the right type and pre-warmed
         if isinstance(cache, DirectRAMExpertCacheManager):
             print("✅ SUCCESS: Correct cache type from factory")
@@ -242,13 +254,13 @@ def test_direct_ram_factory():
 
 def run_all_tests():
     """Run all DirectRAM tests."""
-    
+
     print("🧪 Starting DirectRAM Expert Cache Tests")
     print("=" * 80)
 
     tests = [
         ("Pre-warming Initialization", test_direct_ram_prewarming),
-        ("get() Behavior", test_direct_ram_get_behavior), 
+        ("get() Behavior", test_direct_ram_get_behavior),
         ("get_batch() Behavior", test_direct_ram_batch_behavior),
         ("Memory Management", test_direct_ram_memory_efficiency),
         ("Factory Creation", test_direct_ram_factory),
@@ -272,16 +284,16 @@ def run_all_tests():
     print("\n" + "=" * 80)
     print("📊 TEST SUMMARY")
     print("=" * 80)
-    
+
     passed = sum(1 for _, success in results if success)
     total = len(results)
-    
+
     for test_name, success in results:
         status = "✅ PASS" if success else "❌ FAIL"
         print(f"   {status}: {test_name}")
-    
+
     print(f"\nOverall: {passed}/{total} tests passed")
-    
+
     if passed == total:
         print("🎉 ALL TESTS PASSED - DirectRAM implementation is working correctly!")
         return True
