@@ -6,7 +6,6 @@ caching system for automatic memory management across VRAM, RAM, and DISK.
 """
 
 import torch
-import torch.distributed as dist
 
 from ...boilerplate.gpt_oss.model import ModelConfig, swiglu, RMSNorm
 from ..cache.interfaces.expert_cache import IExpertCacheManager
@@ -46,7 +45,6 @@ class LazyMLPBlock(torch.nn.Module):
         self.num_experts = config.num_experts
         self.experts_per_token = config.experts_per_token
         self.swiglu_limit = config.swiglu_limit
-        self.world_size = dist.get_world_size() if dist.is_initialized() else 1
 
         # Non-expert components using global device config
         self.norm = RMSNorm(config.hidden_size, device=TORCH_VRAM_DEVICE)
@@ -59,7 +57,7 @@ class LazyMLPBlock(torch.nn.Module):
         )
 
         # Initialize expert tensors directly
-        intermediate_size = self.config.intermediate_size // self.world_size
+        intermediate_size = self.config.intermediate_size
 
         self.mlp1_weight = LazyExpertTensor(
             expert_cache=self.expert_cache,
@@ -139,11 +137,6 @@ class LazyMLPBlock(torch.nn.Module):
 
         # MLP2 computation
         t_mlp2 = torch.einsum("beck,bek->bec", mlp2_weight, t_activated)
-
-        # All-reduce for distributed training
-        if self.world_size > 1:
-            dist.all_reduce(t_mlp2, op=dist.ReduceOp.SUM)
-
         t_mlp2 += mlp2_bias
 
         # Weighted sum of expert outputs
