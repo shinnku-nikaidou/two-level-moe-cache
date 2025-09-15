@@ -2,54 +2,14 @@
 Core entities for expert weight caching system.
 """
 
-import os
-import time
 from typing import Optional, Union
 import torch
 
 from src.domain import ModelType
 from src.adapters.expert.factory import AdapterFactory
 from src.adapters.expert.base import ExpertAdapter
+from src.config.util import get_checkpoint_path
 from .types import ExpertKey, MemoryTier
-
-
-def get_checkpoint_path(model_type: ModelType) -> str:
-    """
-    Get the checkpoint path for a given model type.
-
-    Args:
-        model_type: The model type to get the checkpoint path for
-
-    Returns:
-        str: The path to the model checkpoint directory
-
-    Raises:
-        ValueError: If the model type is not supported or path doesn't exist
-    """
-    # Base models directory
-    base_dir = "data/models"
-
-    # Map model types to their directory names
-    model_path_map = {
-        ModelType.GPT_OSS_20B: "gpt-oss-20b/original/",
-        ModelType.GPT_OSS_120B: "gpt-oss-120b/original/",
-        ModelType.PHI_TINY_MOE: "phi-tiny-moe/original/",
-    }
-
-    if model_type not in model_path_map:
-        supported_models = list(model_path_map.keys())
-        raise ValueError(
-            f"Unsupported model type: {model_type}. "
-            f"Supported models: {[m.value for m in supported_models]}"
-        )
-
-    checkpoint_path = os.path.join(base_dir, model_path_map[model_type])
-
-    # Verify the path exists
-    if not os.path.exists(checkpoint_path):
-        raise ValueError(f"Checkpoint path does not exist: {checkpoint_path}")
-
-    return checkpoint_path
 
 
 class Expert:
@@ -76,12 +36,8 @@ class Expert:
         """
         self.expert_key = expert_key
         self.current_tier = current_tier
-        self.data: Optional[torch.Tensor] = None  # Always start unloaded
-        self.device: Optional[torch.device] = None  # Will be set when loading to specific tier
-
-        # Access tracking
-        self.last_access_time = time.time()
-        self.access_count = 0
+        self.data: Optional[torch.Tensor] = None
+        self.device: Optional[torch.device] = None
 
         # Create adapter using factory with automatic checkpoint path resolution
         checkpoint_path = get_checkpoint_path(model_type)
@@ -104,11 +60,6 @@ class Expert:
         if not self.is_loaded or self.data is None:
             return 0
         return self.data.numel() * self.data.element_size()
-
-    def update_access_time(self) -> None:
-        """Update last access time and increment access counter."""
-        self.last_access_time = time.time()
-        self.access_count += 1
 
     def move_to_vram(self, device: Optional[Union[str, torch.device]] = None) -> None:
         """
@@ -137,7 +88,6 @@ class Expert:
         self.data = self.data.to(target_device)
         self.device = torch.device(target_device)
         self.current_tier = MemoryTier.VRAM
-        self.update_access_time()
 
     def move_to_ram(self) -> None:
         """Move expert data to RAM (CPU)."""
@@ -147,7 +97,6 @@ class Expert:
         self.data = self.data.to("cpu")
         self.device = torch.device("cpu")
         self.current_tier = MemoryTier.RAM
-        self.update_access_time()
 
     def unload(self) -> None:
         """Unload expert data from memory."""
@@ -238,7 +187,4 @@ class Expert:
 
         usage = f"{self.memory_usage() / (1024**2):.1f}MB" if self.is_loaded else "0MB"
 
-        return (
-            f"Expert({self.expert_key}, {loaded_status}, "
-            f"{status}, {usage}, accessed={self.access_count})"
-        )
+        return f"Expert({self.expert_key}, {loaded_status}, " f"{status}, {usage})"

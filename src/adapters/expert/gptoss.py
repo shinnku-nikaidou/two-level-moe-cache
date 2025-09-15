@@ -2,7 +2,6 @@
 GPT-OSS model expert weight adapter.
 """
 
-import os
 from typing import Optional
 import torch
 from src.boilerplate.gpt_oss.weights import Checkpoint
@@ -93,15 +92,6 @@ class GPTOSSExpertAdapter(ExpertAdapter):
         return valid_layers and valid_experts and valid_param_types
 
     def _construct_param_name(self, expert_key: ExpertKey) -> str:
-        """
-        Construct checkpoint parameter name from expert key.
-
-        Args:
-            expert_key: The expert key
-
-        Returns:
-            str: The parameter name (e.g., "block.5.mlp.mlp1_weight")
-        """
         return f"block.{expert_key.layer_idx}.mlp.{expert_key.param_type}"
 
     def _extract_expert_slice(
@@ -120,10 +110,6 @@ class GPTOSSExpertAdapter(ExpertAdapter):
         expert_id = expert_key.expert_id
 
         if "weight" in expert_key.param_type:
-            # For weight matrices, first dimension is expert_id
-            # Shape: [num_experts, ...] -> [...]
             return full_tensor[expert_id, ...]
         else:
-            # For bias vectors, first dimension is expert_id
-            # Shape: [num_experts, hidden_size] -> [hidden_size]
             return full_tensor[expert_id, :]

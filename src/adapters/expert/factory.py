@@ -15,9 +15,6 @@ class AdapterFactory:
     _ADAPTER_REGISTRY: Dict[ModelType, Type[ExpertAdapter]] = {
         ModelType.GPT_OSS_20B: GPTOSSExpertAdapter,
         ModelType.GPT_OSS_120B: GPTOSSExpertAdapter,
-        # Future model types can be added here
-        # ModelType.MIXTRAL_8X7B: MixtralExpertAdapter,
-        # ModelType.PHI_TINY_MOE: PhiTinyMoeExpertAdapter,
     }
 
     @classmethod
