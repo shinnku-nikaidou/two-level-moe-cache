@@ -9,7 +9,10 @@ This module provides L        # Load experts from cache in batch
         for key, expert in expert_dict.items():
             if expert.data is None:
                 raise RuntimeError(f"Expert {key} data is None after loading")
-            expert_tensors[key.expert_id] = expert.data  # Use expert_id instead of expert_idxTensor that uses expert caching system
+
+            # Use expert data directly - no unnecessary device/dtype conversion!
+            # The cache manager should have already put the expert on the appropriate device
+            expert_tensors[key.expert_id] = expert.dataTensor that uses expert caching system
 instead of direct checkpoint access for memory-efficient expert loading.
 """
 
@@ -106,8 +109,7 @@ class LazyExpertTensor:
             result_tensors = []
             for idx in expert_indices.cpu().tolist():
                 tensor = expert_tensors[idx]
-                # Ensure correct device and dtype
-                tensor = tensor.to(device=self.device, dtype=self.dtype)
+                # Expert tensors should already be on the correct device from cache
                 result_tensors.append(tensor)
 
             result = torch.stack(result_tensors, dim=0)
@@ -115,13 +117,21 @@ class LazyExpertTensor:
             # Multi-dimensional case: preserve original shape
             batch_size, experts_per_token = expert_indices.shape
             result_shape = (batch_size, experts_per_token) + self.expected_shape[1:]
-            result = torch.empty(result_shape, device=self.device, dtype=self.dtype)
+
+            # Use the device of the first expert tensor
+            first_expert_idx = expert_indices[0, 0].item()
+            reference_tensor = expert_tensors[first_expert_idx]
+            result = torch.empty(
+                result_shape,
+                device=reference_tensor.device,
+                dtype=reference_tensor.dtype,
+            )
 
             for b in range(batch_size):
                 for e in range(experts_per_token):
                     expert_idx = expert_indices[b, e].item()
                     tensor = expert_tensors[expert_idx]
-                    tensor = tensor.to(device=self.device, dtype=self.dtype)
+                    # No device conversion needed - use tensor as-is
                     result[b, e] = tensor
 
         return result

@@ -5,7 +5,7 @@ This module provides an LRU (Least Recently Used) cache implementation for
 managing expert weights with automatic memory tier coordination and eviction.
 """
 
-import time
+import torch
 from collections import OrderedDict
 from typing import Dict, List, Optional, Any
 from ..cache.interfaces.expert_cache import IExpertCache
@@ -88,6 +88,9 @@ class LRUExpertCacheManager(IExpertCache):
     def get_batch(self, keys: List[ExpertKey]) -> Dict[ExpertKey, Expert]:
         """
         Retrieve multiple experts efficiently in batch.
+        
+        All experts in the batch will be promoted to the same memory tier (preferring VRAM)
+        to ensure device consistency for tensor operations.
 
         Args:
             keys: List of expert identifiers
@@ -107,9 +110,9 @@ class LRUExpertCacheManager(IExpertCache):
                 expert = self._experts.pop(key)
                 self._experts[key] = expert  # Move to end (LRU)
 
-                # Return a copy of the expert to avoid shared reference issues
-                expert_copy = self._copy_expert_data(expert)
-                result[key] = expert_copy
+                # Return the expert directly - no copying needed
+                # The shared reference issue is handled by not calling unload() in evict()
+                result[key] = expert
 
                 self._stats["hits"] += 1
                 self._ensure_expert_tier(key, expert)
@@ -122,6 +125,9 @@ class LRUExpertCacheManager(IExpertCache):
             expert = self._load_expert(key)
             self.put(key, expert)
             result[key] = expert
+
+        # IMPORTANT: Ensure all experts in batch are on same device for consistency
+        self._ensure_batch_device_consistency(result)
 
         return result
 
@@ -271,9 +277,17 @@ class LRUExpertCacheManager(IExpertCache):
         """
         # Create expert instance
         expert = Expert(expert_key=key, model_type=self._model_type)
-        expert.load_from_nvme_to_ram()  # Load from disk to RAM
+        
+        # Load to VRAM if space available, otherwise RAM
+        vram_count = self._tier_manager.get_tier_size(MemoryTier.VRAM)
+        if vram_count < self._max_vram_experts and torch.cuda.is_available():
+            expert.load_from_nvme_to_vram()  # Load directly to VRAM
+            self._tier_manager.add_to_tier(MemoryTier.VRAM, key)
+        else:
+            expert.load_from_nvme_to_ram()  # Load to RAM
+            self._tier_manager.add_to_tier(MemoryTier.RAM, key)
+        
         self._stats["loads"] += 1
-
         return expert
 
     def _ensure_expert_tier(self, key: ExpertKey, expert: Expert) -> None:
@@ -342,30 +356,58 @@ class LRUExpertCacheManager(IExpertCache):
             # Move to disk and remove from cache
             for key in lru_experts:
                 self.evict(key)
-
-    def _copy_expert_data(self, expert: Expert) -> Expert:
+                
+    def _ensure_batch_device_consistency(self, expert_dict: Dict[ExpertKey, Expert]) -> None:
         """
-        Create a copy of expert with independent data to avoid shared reference issues.
-
+        Ensure all experts in a batch are on the same device.
+        
+        This is critical for tensor operations - if experts are on different devices
+        (some in VRAM, some in RAM), tensor operations will fail.
+        
         Args:
-            expert: Original expert instance
-
-        Returns:
-            New expert instance with copied data
+            expert_dict: Dictionary of experts to check and fix device consistency
         """
-        # Create new expert instance with same key and model type
-        expert_copy = Expert(
-            expert_key=expert.expert_key,
-            model_type=self._model_type,
-            current_tier=expert.current_tier,
-            data=(
-                expert.data.clone() if expert.data is not None else None
-            ),  # Deep copy tensor data
-            device=expert.device,
-        )
-
-        # Copy access tracking info
-        expert_copy.last_access_time = expert.last_access_time
-        expert_copy.access_count = expert.access_count
-
-        return expert_copy
+        if not expert_dict:
+            return
+            
+        # Determine target device - prefer CUDA if available
+        target_device = "cuda" if torch.cuda.is_available() else "cpu"
+        target_tier = MemoryTier.VRAM if torch.cuda.is_available() else MemoryTier.RAM
+        
+        # Check and fix device for each expert
+        for key, expert in expert_dict.items():
+            if expert.data is None:
+                continue  # Skip unloaded experts
+                
+            current_device_str = str(expert.data.device)
+            
+            # If expert is not on target device, promote it
+            if current_device_str != target_device:
+                if target_tier == MemoryTier.VRAM and expert.current_tier != MemoryTier.VRAM:
+                    # Try to promote to VRAM
+                    try:
+                        expert.move_to_vram()
+                        
+                        # Update tier tracking
+                        old_tier = self._tier_manager.get_tier(key)
+                        if old_tier:
+                            self._tier_manager.move_between_tiers(key, old_tier, MemoryTier.VRAM)
+                        else:
+                            self._tier_manager.add_to_tier(MemoryTier.VRAM, key)
+                            
+                        self._stats["tier_migrations"] += 1
+                        
+                    except RuntimeError:
+                        # VRAM promotion failed, ensure at least on CPU
+                        if expert.current_tier != MemoryTier.RAM:
+                            expert.move_to_ram()
+                            
+                elif target_tier == MemoryTier.RAM and expert.current_tier != MemoryTier.RAM:
+                    expert.move_to_ram()
+                    
+                    # Update tier tracking
+                    old_tier = self._tier_manager.get_tier(key)
+                    if old_tier:
+                        self._tier_manager.move_between_tiers(key, old_tier, MemoryTier.RAM)
+                    else:
+                        self._tier_manager.add_to_tier(MemoryTier.RAM, key)
