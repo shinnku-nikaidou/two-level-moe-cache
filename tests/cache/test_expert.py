@@ -142,13 +142,13 @@ class TestExpert:
         expert.current_tier = MemoryTier.RAM
 
         # Move to RAM
-        expert.move_to_ram()
+        expert.vram_to_ram()
         assert expert.current_tier == MemoryTier.RAM
         assert expert.device == torch.device("cpu")
 
         # Try to move to VRAM if CUDA is available
         if torch.cuda.is_available():
-            expert.move_to_vram()
+            expert.ram_to_vram()
             assert expert.current_tier == MemoryTier.VRAM
             assert "cuda" in str(expert.device)
 
@@ -213,7 +213,7 @@ def test_expert_workflow():
 
     # Try to move to VRAM if available
     if torch.cuda.is_available():
-        expert.move_to_vram()
+        expert.ram_to_vram()
         assert expert.current_tier == MemoryTier.VRAM
 
         # Then demote back

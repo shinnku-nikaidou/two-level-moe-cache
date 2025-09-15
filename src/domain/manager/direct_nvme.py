@@ -166,20 +166,6 @@ class DirectNVMEExpertCacheManager(IExpertCacheManager):
         expert = Expert(expert_key=key, model_type=self._model_type)
 
         # Load directly to VRAM (bypass RAM completely)
-        expert.load_from_nvme_to_vram()
+        expert.nvme_to_vram()
 
         return expert
-
-    def _estimate_memory_usage(self) -> float:
-        """
-        Estimate current VRAM usage in MB.
-
-        Returns:
-            Estimated memory usage in MB
-        """
-        total_bytes = 0
-        for expert in self._loaded_experts.values():
-            if expert.data is not None:
-                total_bytes += expert.data.numel() * expert.data.element_size()
-
-        return total_bytes / (1024 * 1024)  # Convert to MB

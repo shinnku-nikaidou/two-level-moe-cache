@@ -80,9 +80,9 @@ class LazyExpertTensor:
         # Direct result construction with null check
         expert_tensors = []
         for expert in experts:
-            if expert.data is None:
+            if expert.data_vram is None:
                 raise RuntimeError(f"Expert data is None after loading")
-            expert_tensors.append(expert.data)
+            expert_tensors.append(expert.data_vram)
 
         result = torch.stack(expert_tensors).view(
             batch_size, experts_per_token, *self.expected_shape[1:]

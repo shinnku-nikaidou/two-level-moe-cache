@@ -199,10 +199,10 @@ class LRUExpertCacheManager(IExpertCacheManager):
         # Load to VRAM if space available, otherwise RAM
         vram_count = self._tier_manager.get_tier_size(MemoryTier.VRAM)
         if vram_count < self._max_vram_experts and torch.cuda.is_available():
-            expert.load_from_nvme_to_vram()  # Load directly to VRAM
+            expert.nvme_to_vram()  # Load directly to VRAM
             self._tier_manager.add_to_tier(MemoryTier.VRAM, key)
         else:
-            expert.load_from_nvme_to_ram()  # Load to RAM
+            expert.nvme_to_ram()  # Load to RAM
             self._tier_manager.add_to_tier(MemoryTier.RAM, key)
 
         return expert
@@ -227,7 +227,7 @@ class LRUExpertCacheManager(IExpertCacheManager):
             else:
                 self._tier_manager.add_to_tier(MemoryTier.VRAM, key)
 
-            expert.move_to_vram()  # Promote to VRAM
+            expert.ram_to_vram()  # Promote to VRAM
 
     def _enforce_capacity_limits(self) -> None:
         """
@@ -252,7 +252,7 @@ class LRUExpertCacheManager(IExpertCacheManager):
             for key in lru_experts:
                 if key in self._experts:
                     expert = self._experts[key]
-                    expert.move_to_ram()
+                    expert.vram_to_ram()
                     self._tier_manager.move_between_tiers(
                         key, MemoryTier.VRAM, MemoryTier.RAM
                     )
@@ -306,7 +306,7 @@ class LRUExpertCacheManager(IExpertCacheManager):
                 ):
                     # Try to promote to VRAM
                     try:
-                        expert.move_to_vram()
+                        expert.ram_to_vram()
 
                         # Update tier tracking
                         old_tier = self._tier_manager.get_tier(key)
@@ -320,13 +320,13 @@ class LRUExpertCacheManager(IExpertCacheManager):
                     except RuntimeError:
                         # VRAM promotion failed, ensure at least on CPU
                         if expert.current_tier != MemoryTier.RAM:
-                            expert.move_to_ram()
+                            expert.vram_to_ram()
 
                 elif (
                     target_tier == MemoryTier.RAM
                     and expert.current_tier != MemoryTier.RAM
                 ):
-                    expert.move_to_ram()
+                    expert.vram_to_ram()
 
                     # Update tier tracking
                     old_tier = self._tier_manager.get_tier(key)
