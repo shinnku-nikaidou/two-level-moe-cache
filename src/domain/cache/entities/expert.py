@@ -8,7 +8,6 @@ import torch
 from src.domain import ModelType
 from src.adapters.expert.factory import AdapterFactory
 from src.adapters.expert.base import ExpertAdapter
-from src.config.util import get_checkpoint_path
 from .types import ExpertKey, MemoryTier
 
 
@@ -38,12 +37,7 @@ class Expert:
         self.current_tier = current_tier
         self.data: Optional[torch.Tensor] = None
         self.device: Optional[torch.device] = None
-
-        # Create adapter using factory with automatic checkpoint path resolution
-        checkpoint_path = get_checkpoint_path(model_type)
-        self.adapter: ExpertAdapter = AdapterFactory.create_adapter(
-            model_type, checkpoint_path
-        )
+        self.adapter: ExpertAdapter = AdapterFactory.create_adapter(model_type)
 
     @property
     def is_loaded(self) -> bool:
@@ -99,7 +93,7 @@ class Expert:
         self.current_tier = MemoryTier.RAM
 
     def unload(self) -> None:
-        """Unload expert data from memory."""
+        """Unload expert data from memory or gpu"""
         self.data = None
         self.current_tier = MemoryTier.DISK
         # Note: Keep device preference for future loads

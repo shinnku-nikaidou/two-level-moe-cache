@@ -1,26 +1,8 @@
-"""
-Lazy loading tensor implementation for expert weights.
-
-This module provides L        # Load experts from cache in batch
-        expert_dict: Dict[ExpertKey, Expert] = self.expert_cache.get_batch(required_keys)
-
-        # Extract tensors and build index mapping
-        expert_tensors = {}
-        for key, expert in expert_dict.items():
-            if expert.data is None:
-                raise RuntimeError(f"Expert {key} data is None after loading")
-
-            # Use expert data directly - no unnecessary device/dtype conversion!
-            # The cache manager should have already put the expert on the appropriate device
-            expert_tensors[key.expert_id] = expert.dataTensor that uses expert caching system
-instead of direct checkpoint access for memory-efficient expert loading.
-"""
-
 import torch
 from typing import Dict, List, Any
 from ..cache.interfaces.expert_cache import IExpertCache
 from ..cache.entities.expert import Expert
-from ..cache.entities.types import ExpertKey, MemoryTier
+from ..cache.entities.types import ExpertKey, ExpertParamType
 
 
 class LazyExpertTensor:
@@ -36,7 +18,7 @@ class LazyExpertTensor:
         self,
         expert_cache: IExpertCache,
         layer_idx: int,
-        param_type: str,  # 'mlp1_weight', 'mlp1_bias', 'mlp2_weight', 'mlp2_bias'
+        param_type: ExpertParamType,  # Use existing ExpertParamType enum
         expected_shape: tuple,
         dtype: torch.dtype,
         device: torch.device,
@@ -47,7 +29,7 @@ class LazyExpertTensor:
         Args:
             expert_cache: Expert cache instance for loading weights
             layer_idx: Layer index for parameter naming
-            param_type: Parameter type ('mlp1_weight', 'mlp1_bias', etc.)
+            param_type: Parameter type enum (ExpertParamType.MLP1_WEIGHT, etc.)
             expected_shape: Expected full tensor shape (num_experts, ...)
             dtype: Target data type for loaded tensors
             device: Target device for loaded tensors
@@ -66,7 +48,7 @@ class LazyExpertTensor:
             expert_key = ExpertKey(
                 layer_idx=layer_idx,
                 expert_id=expert_idx,  # Use expert_id instead of expert_idx
-                param_type=param_type,
+                param_type=param_type,  # Use enum directly for ExpertKey
             )
             self._expert_keys.append(expert_key)
 

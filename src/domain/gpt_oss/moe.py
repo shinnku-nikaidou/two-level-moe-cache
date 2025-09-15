@@ -10,7 +10,7 @@ import torch.distributed as dist
 
 from ...boilerplate.gpt_oss.model import ModelConfig, swiglu, RMSNorm
 from ..cache.interfaces.expert_cache import IExpertCache
-from ..cache.entities.types import ExpertKey
+from ..cache.entities.types import ExpertKey, ExpertParamType
 from .lazy_tensor import LazyExpertTensor
 
 
@@ -87,7 +87,7 @@ class LazyMLPBlock(torch.nn.Module):
         self.mlp1_weight = LazyExpertTensor(
             expert_cache=self.expert_cache,
             layer_idx=self.layer_idx,
-            param_type="mlp1_weight",
+            param_type=ExpertParamType.MLP1_WEIGHT,
             expected_shape=(
                 self.num_experts,
                 intermediate_size * 2,
@@ -100,7 +100,7 @@ class LazyMLPBlock(torch.nn.Module):
         self.mlp1_bias = LazyExpertTensor(
             expert_cache=self.expert_cache,
             layer_idx=self.layer_idx,
-            param_type="mlp1_bias",
+            param_type=ExpertParamType.MLP1_BIAS,
             expected_shape=(self.num_experts, intermediate_size * 2),
             dtype=torch.bfloat16,
             device=self.device,
@@ -110,7 +110,7 @@ class LazyMLPBlock(torch.nn.Module):
         self.mlp2_weight = LazyExpertTensor(
             expert_cache=self.expert_cache,
             layer_idx=self.layer_idx,
-            param_type="mlp2_weight",
+            param_type=ExpertParamType.MLP2_WEIGHT,
             expected_shape=(
                 self.num_experts,
                 self.config.hidden_size,
@@ -123,17 +123,11 @@ class LazyMLPBlock(torch.nn.Module):
         self.mlp2_bias = LazyExpertTensor(
             expert_cache=self.expert_cache,
             layer_idx=self.layer_idx,
-            param_type="mlp2_bias",
+            param_type=ExpertParamType.MLP2_BIAS,
             expected_shape=(self.num_experts, self.config.hidden_size),
             dtype=torch.bfloat16,
             device=self.device,
         )
-
-    def _load_gate_weights_if_needed(self):
-        """Load gate weights if not already loaded (for initialization)."""
-        # This would be called during model loading to initialize gate weights
-        # For now, assume gate weights are loaded normally during model initialization
-        pass
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """

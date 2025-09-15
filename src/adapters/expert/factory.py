@@ -18,15 +18,12 @@ class AdapterFactory:
     }
 
     @classmethod
-    def create_adapter(
-        cls, model_type: ModelType, checkpoint_path: str
-    ) -> ExpertAdapter:
+    def create_adapter(cls, model_type: ModelType) -> ExpertAdapter:
         """
         Create an expert adapter for the specified model type.
 
         Args:
             model_type: The type of model to create an adapter for
-            checkpoint_path: Path to the model checkpoint directory
 
         Returns:
             ExpertAdapter: An adapter instance for the specified model
@@ -42,7 +39,7 @@ class AdapterFactory:
             )
 
         adapter_class = cls._ADAPTER_REGISTRY[model_type]
-        return adapter_class(checkpoint_path)
+        return adapter_class(model_type)
 
     @classmethod
     def list_supported_models(cls) -> list[ModelType]:

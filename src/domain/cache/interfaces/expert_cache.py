@@ -91,7 +91,7 @@ class IExpertCache(ABC):
     def unload_batch(self, keys: List[ExpertKey]) -> int:
         """
         Immediate unloading for use-and-delete strategy.
-        
+
         Default implementation delegates to evict_batch, but specialized
         caches can override for immediate memory cleanup.
 
