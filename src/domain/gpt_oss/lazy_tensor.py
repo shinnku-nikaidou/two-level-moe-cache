@@ -57,63 +57,37 @@ class LazyExpertTensor:
         Load specific experts using the expert cache system.
 
         Args:
-            expert_indices: Tensor of expert indices to load, shape (batch_size, experts_per_token)
+            expert_indices: Tensor of expert indices, shape (batch_size, experts_per_token)
 
         Returns:
             Selected expert weights, shape (batch_size, experts_per_token, ...)
         """
-        # Convert tensor indices to list for processing
-        if expert_indices.dim() == 1:
-            # Single batch dimension
-            indices_list = expert_indices.cpu().tolist()
-        else:
-            # Multi-batch dimension: flatten and get unique indices
-            indices_list = expert_indices.flatten().unique().cpu().tolist()
+        # Simple validation - fail fast
+        assert (
+            expert_indices.dim() == 2
+        ), f"Expected 2D tensor, got {expert_indices.dim()}D"
+        batch_size, experts_per_token = expert_indices.shape
 
-        # Get expert keys for the requested indices
-        required_keys = [self._expert_keys[idx] for idx in indices_list]
+        # Linear collection of expert keys (no optimization)
+        expert_keys = []
+        for b in range(batch_size):
+            for e in range(experts_per_token):
+                expert_id = int(expert_indices[b, e].item())
+                expert_keys.append(self._expert_keys[expert_id])
 
-        # Load experts from cache in batch
-        expert_list: List[Expert] = self.expert_cache.get_batch(required_keys)
+        # Batch load experts
+        experts = self.expert_cache.get_batch(expert_keys)
 
-        # Extract tensors and build index mapping
-        expert_tensors = {}
-        for i, expert in enumerate(expert_list):
-            key = required_keys[i]  # experts are returned in same order as keys
+        # Direct result construction with null check
+        expert_tensors = []
+        for expert in experts:
             if expert.data is None:
-                raise RuntimeError(f"Expert {key} data is None after loading")
-            expert_tensors[key.expert_id] = expert.data
+                raise RuntimeError(f"Expert data is None after loading")
+            expert_tensors.append(expert.data)
 
-        # Build result tensor by indexing
-        if expert_indices.dim() == 1:
-            # Simple 1D case
-            result_tensors = []
-            for idx in expert_indices.cpu().tolist():
-                tensor = expert_tensors[idx]
-                # Expert tensors should already be on the correct device from cache
-                result_tensors.append(tensor)
-
-            result = torch.stack(result_tensors, dim=0)
-        else:
-            # Multi-dimensional case: preserve original shape
-            batch_size, experts_per_token = expert_indices.shape
-            result_shape = (batch_size, experts_per_token) + self.expected_shape[1:]
-
-            # Use the device of the first expert tensor
-            first_expert_idx = expert_indices[0, 0].item()
-            reference_tensor = expert_tensors[first_expert_idx]
-            result = torch.empty(
-                result_shape,
-                device=reference_tensor.device,
-                dtype=reference_tensor.dtype,
-            )
-
-            for b in range(batch_size):
-                for e in range(experts_per_token):
-                    expert_idx = expert_indices[b, e].item()
-                    tensor = expert_tensors[expert_idx]
-                    # No device conversion needed - use tensor as-is
-                    result[b, e] = tensor
+        result = torch.stack(expert_tensors).view(
+            batch_size, experts_per_token, *self.expected_shape[1:]
+        )
 
         return result
 
