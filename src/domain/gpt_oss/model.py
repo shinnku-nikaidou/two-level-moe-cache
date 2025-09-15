@@ -178,7 +178,9 @@ class LazyTransformer(torch.nn.Module):
         return x
 
     @staticmethod
-    def from_checkpoint(path: str, device: str | torch.device) -> "LazyTransformer":
+    def from_checkpoint(
+        checkpoint_dir: str, device: str | torch.device
+    ) -> "LazyTransformer":
         """
         Load transformer from checkpoint with lazy loading.
 
@@ -192,30 +194,17 @@ class LazyTransformer(torch.nn.Module):
         if not isinstance(device, torch.device):
             device = torch.device(device)
 
-        # Ensure we have directory path for Checkpoint class
-        checkpoint_dir = path
-        if path.endswith(".safetensors"):
-            checkpoint_dir = os.path.dirname(path)
-
-        # Load configuration from checkpoint path (expects original subdirectory or direct path)
         config_path = os.path.join(checkpoint_dir, "config.json")
         with open(config_path, "r") as f:
             json_config = json.load(f)
-
-            # Use direct mapping since original config matches ModelConfig fields
             model_config = ModelConfig(**json_config)
 
-        # Create lazy transformer with specified device
         model = LazyTransformer(
             config=model_config, checkpoint_path=checkpoint_dir, device=device
         )
         model.eval()
 
-        # Load non-expert weights normally - use correct device
         checkpoint = Checkpoint(checkpoint_dir, device)
-
-        my_rank = dist.get_rank() if dist.is_initialized() else 0
-        world_size = dist.get_world_size() if dist.is_initialized() else 1
 
         for name, param in model.named_parameters():
             # Skip MLP expert weights (they'll be loaded lazily)
@@ -230,40 +219,10 @@ class LazyTransformer(torch.nn.Module):
             # Load other parameters normally
             try:
                 loaded_tensor = checkpoint.get(name)
-
-                # Apply world_size sharding if needed (but not for single node CPU)
-                if world_size > 1:
-                    per_rank_intermediate_size = (
-                        model_config.intermediate_size // world_size
-                    )
-                    if "mlp1" in name:  # Non-expert MLP1 parameters (if any)
-                        loaded_tensor = loaded_tensor[
-                            :,
-                            my_rank
-                            * 2
-                            * per_rank_intermediate_size : (my_rank + 1)
-                            * 2
-                            * per_rank_intermediate_size,
-                            ...,
-                        ]
-                    elif "mlp2_weight" in name:  # Non-expert MLP2 weights (if any)
-                        loaded_tensor = loaded_tensor[
-                            ...,
-                            my_rank
-                            * per_rank_intermediate_size : (my_rank + 1)
-                            * per_rank_intermediate_size,
-                        ]
-
-                # Ensure loaded tensor is on the same device as parameter
-                if loaded_tensor.device != param.device:
-                    loaded_tensor = loaded_tensor.to(param.device)
-
                 param.data.copy_(loaded_tensor)
 
             except Exception as e:
-                # Skip missing parameters - don't print for expected skips
-                if "No CUDA GPUs are available" not in str(e):
-                    print(f"Skipping parameter {name}: {e}")
+                print(f"Skipping parameter {name}: {e}")
 
         return model
 

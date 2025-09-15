@@ -21,13 +21,13 @@ class LazyTokenGenerator:
     """LazyTransformer version of TokenGenerator"""
 
     @torch.inference_mode()
-    def __init__(self, checkpoint: str, device: torch.device):
+    def __init__(self, checkpoint_dir: str, device: torch.device):
         self.device = device
-        self.model = self._load_lazy_model(checkpoint)
+        self.model = self._load_lazy_model(checkpoint_dir)
 
-    def _load_lazy_model(self, path: str) -> LazyTransformer:
+    def _load_lazy_model(self, checkpoint_dir: str) -> LazyTransformer:
         """Load LazyTransformer with lazy expert loading"""
-        model = LazyTransformer.from_checkpoint(path, device=self.device)
+        model = LazyTransformer.from_checkpoint(checkpoint_dir, device=self.device)
         model.eval()
         return model
 
