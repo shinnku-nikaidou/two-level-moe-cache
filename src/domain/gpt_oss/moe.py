@@ -9,8 +9,9 @@ import torch
 import torch.distributed as dist
 
 from ...boilerplate.gpt_oss.model import ModelConfig, swiglu, RMSNorm
-from ..cache.interfaces.expert_cache import IExpertCache
+from ..cache.interfaces.expert_cache import IExpertCacheManager
 from ..cache.entities.types import ExpertKey, ExpertParamType
+from src.config import TORCH_VRAM_DEVICE
 from .lazy_tensor import LazyExpertTensor
 
 
@@ -25,9 +26,8 @@ class LazyMLPBlock(torch.nn.Module):
     def __init__(
         self,
         config: ModelConfig,
-        expert_cache: IExpertCache,
+        expert_cache: IExpertCacheManager,
         layer_idx: int,
-        device: torch.device | None = None,
     ):
         """
         Initialize lazy MLP block with expert cache integration.
@@ -36,13 +36,11 @@ class LazyMLPBlock(torch.nn.Module):
             config: Model configuration
             expert_cache: Expert cache instance for loading weights
             layer_idx: Layer index for parameter naming
-            device: Target device for computations (None for auto-detection)
         """
         super().__init__()
         self.config = config
         self.expert_cache = expert_cache
         self.layer_idx = layer_idx
-        self.device = device  # Will be set on first forward pass if None
 
         # MoE configuration
         self.num_experts = config.num_experts
@@ -50,40 +48,19 @@ class LazyMLPBlock(torch.nn.Module):
         self.swiglu_limit = config.swiglu_limit
         self.world_size = dist.get_world_size() if dist.is_initialized() else 1
 
-        # Non-expert components (device will be set during forward if needed)
-        self.norm = RMSNorm(config.hidden_size, device=device)
+        # Non-expert components using global device config
+        self.norm = RMSNorm(config.hidden_size, device=TORCH_VRAM_DEVICE)
         self.gate = torch.nn.Linear(
             config.hidden_size,
             config.num_experts,
-            device=device,
+            device=TORCH_VRAM_DEVICE,
             dtype=torch.bfloat16,
             bias=False,
         )
 
-        # Lazy expert tensors will be initialized on first forward pass
-        self._lazy_tensors_initialized = False
+        # Initialize expert tensors directly
+        intermediate_size = self.config.intermediate_size // self.world_size
 
-    def _ensure_device_and_tensors(self, input_device: torch.device):
-        """Ensure device is set and lazy tensors are initialized."""
-        if self.device is None:
-            self.device = input_device
-            # Move components to detected device
-            self.norm = self.norm.to(input_device)
-            self.gate = self.gate.to(input_device)
-
-        if not self._lazy_tensors_initialized:
-            intermediate_size = self.config.intermediate_size // self.world_size
-            self._init_lazy_expert_tensors(intermediate_size)
-            self._lazy_tensors_initialized = True
-
-    def _init_lazy_expert_tensors(self, intermediate_size: int):
-        """Initialize lazy loading tensors for expert weights using expert cache."""
-        # Ensure device is set
-        assert (
-            self.device is not None
-        ), "Device must be set before initializing lazy tensors"
-
-        # Create LazyExpertTensor instances using expert cache
         self.mlp1_weight = LazyExpertTensor(
             expert_cache=self.expert_cache,
             layer_idx=self.layer_idx,
@@ -94,7 +71,7 @@ class LazyMLPBlock(torch.nn.Module):
                 self.config.hidden_size,
             ),
             dtype=torch.bfloat16,
-            device=self.device,
+            device=TORCH_VRAM_DEVICE,
         )
 
         self.mlp1_bias = LazyExpertTensor(
@@ -103,7 +80,7 @@ class LazyMLPBlock(torch.nn.Module):
             param_type=ExpertParamType.MLP1_BIAS,
             expected_shape=(self.num_experts, intermediate_size * 2),
             dtype=torch.bfloat16,
-            device=self.device,
+            device=TORCH_VRAM_DEVICE,
         )
 
         # MLP2 (down) tensors
@@ -117,7 +94,7 @@ class LazyMLPBlock(torch.nn.Module):
                 intermediate_size,
             ),
             dtype=torch.bfloat16,
-            device=self.device,
+            device=TORCH_VRAM_DEVICE,
         )
 
         self.mlp2_bias = LazyExpertTensor(
@@ -126,7 +103,7 @@ class LazyMLPBlock(torch.nn.Module):
             param_type=ExpertParamType.MLP2_BIAS,
             expected_shape=(self.num_experts, self.config.hidden_size),
             dtype=torch.bfloat16,
-            device=self.device,
+            device=TORCH_VRAM_DEVICE,
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -139,9 +116,6 @@ class LazyMLPBlock(torch.nn.Module):
         Returns:
             Output tensor after MoE computation
         """
-        # Auto-detect device from input and initialize if needed
-        self._ensure_device_and_tensors(x.device)
-
         # Normalize input
         t = self.norm(x)
 

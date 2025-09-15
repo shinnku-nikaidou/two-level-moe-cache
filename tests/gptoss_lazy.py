@@ -28,7 +28,7 @@ class LazyTokenGenerator:
 
     def _load_lazy_model(self, model_type: ModelType) -> LazyTransformer:
         """Load LazyTransformer with lazy expert loading"""
-        model = LazyTransformer.from_model_type(model_type, device=self.device)
+        model = LazyTransformer.from_model_type(model_type)
         model.eval()
         return model
 
@@ -87,8 +87,8 @@ def test_basic_functionality():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    # Load LazyTransformer with specified device
-    model = LazyTransformer.from_model_type(ModelType.GPT_OSS_20B, device=device)
+    # Load LazyTransformer (device is configured globally)
+    model = LazyTransformer.from_model_type(ModelType.GPT_OSS_20B)
     print("LazyTransformer loaded successfully")
 
     # Get tokenizer

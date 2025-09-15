@@ -1,6 +1,6 @@
 import torch
 from typing import Dict, List, Any
-from ..cache.interfaces.expert_cache import IExpertCache
+from ..cache.interfaces.expert_cache import IExpertCacheManager
 from ..cache.entities.expert import Expert
 from ..cache.entities.types import ExpertKey, ExpertParamType
 
@@ -16,7 +16,7 @@ class LazyExpertTensor:
 
     def __init__(
         self,
-        expert_cache: IExpertCache,
+        expert_cache: IExpertCacheManager,
         layer_idx: int,
         param_type: ExpertParamType,  # Use existing ExpertParamType enum
         expected_shape: tuple,

@@ -8,7 +8,7 @@ managing expert weights with automatic memory tier coordination and eviction.
 import torch
 from collections import OrderedDict
 from typing import Dict, List, Optional, Any
-from ..cache.interfaces.expert_cache import IExpertCache
+from ..cache.interfaces.expert_cache import IExpertCacheManager
 from ..cache.interfaces.memory_tier import IMemoryTierManager
 from ..cache.entities.expert import Expert
 from ..cache.entities.types import ExpertKey, MemoryTier
@@ -16,7 +16,7 @@ from .. import ModelType
 from .memory_tier import SetBasedMemoryTierManager
 
 
-class LRUExpertCacheManager(IExpertCache):
+class LRUExpertCacheManager(IExpertCacheManager):
     """
     LRU-based expert cache manager with automatic tier coordination.
 

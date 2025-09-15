@@ -9,16 +9,17 @@ import os
 import json
 import torch
 
-from ...boilerplate.gpt_oss.model import (
+from src.boilerplate.gpt_oss.model import (
     ModelConfig,
     AttentionBlock,
     RMSNorm,
 )
-from ...boilerplate.gpt_oss.weights import Checkpoint
-from ..cache.interfaces.expert_cache import IExpertCache
-from ...services.cache import ExpertCacheFactory
-from ...config.util import get_checkpoint_path
-from ...domain import ModelType
+from src.boilerplate.gpt_oss.weights import Checkpoint
+from src.domain.cache.interfaces.expert_cache import IExpertCacheManager
+from src.services.cache import ExpertCacheFactory
+from src.config.util import get_checkpoint_path
+from src.domain import ModelType
+from src.config import TORCH_VRAM_DEVICE
 from .moe import LazyMLPBlock
 
 
@@ -34,8 +35,7 @@ class LazyTransformerBlock(torch.nn.Module):
         self,
         config: ModelConfig,
         layer_idx: int,
-        expert_cache: IExpertCache,
-        device: torch.device | None = None,
+        expert_cache_manager: IExpertCacheManager,
     ):
         """
         Initialize lazy transformer block.
@@ -44,16 +44,15 @@ class LazyTransformerBlock(torch.nn.Module):
             config: Model configuration
             layer_idx: Layer index
             expert_cache: Expert cache instance for loading weights
-            device: Target device for components
         """
         super().__init__()
         self.layer_idx = layer_idx
 
-        # Use regular attention block with specified device
-        self.attn = AttentionBlock(config, layer_idx, device=device)
+        # Use regular attention block with global device config
+        self.attn = AttentionBlock(config, layer_idx, device=TORCH_VRAM_DEVICE)
 
         # Use lazy MLP block with expert cache for memory efficiency
-        self.mlp = LazyMLPBlock(config, expert_cache, layer_idx, device=device)
+        self.mlp = LazyMLPBlock(config, expert_cache_manager, layer_idx)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through attention and lazy MLP blocks."""
@@ -74,7 +73,6 @@ class LazyTransformer(torch.nn.Module):
         self,
         config: ModelConfig,
         model_type: ModelType,
-        device: torch.device | None = None,
     ):
         """
         Initialize lazy transformer with expert cache system.
@@ -82,7 +80,6 @@ class LazyTransformer(torch.nn.Module):
         Args:
             config: Model configuration
             model_type: Model type for automatic checkpoint path resolution
-            device: Target device for components
         """
         super().__init__()
         self.config = config
@@ -90,32 +87,33 @@ class LazyTransformer(torch.nn.Module):
         # Create expert cache using model_type (no external dependencies needed)
         # Create simple DirectVRAM cache for maximum performance
         # This implements "use-and-delete" strategy - no complex LRU management
-        self.expert_cache = ExpertCacheFactory.create_direct_vram_cache(
+        self.expert_cache_manager = ExpertCacheFactory.create_direct_vram_cache(
             model_type=model_type,
         )
 
-        # Standard components with specified device
+        # Standard components with global device config
         self.embedding = torch.nn.Embedding(
-            config.vocab_size, config.hidden_size, dtype=torch.bfloat16, device=device
+            config.vocab_size,
+            config.hidden_size,
+            dtype=torch.bfloat16,
+            device=TORCH_VRAM_DEVICE,
         )
 
         # Use lazy transformer blocks with expert cache
         self.block = torch.nn.ModuleList(
             [
-                LazyTransformerBlock(
-                    config, layer_idx, self.expert_cache, device=device
-                )
+                LazyTransformerBlock(config, layer_idx, self.expert_cache_manager)
                 for layer_idx in range(config.num_hidden_layers)
             ]
         )
 
-        self.norm = RMSNorm(config.hidden_size, device=device)
+        self.norm = RMSNorm(config.hidden_size, device=TORCH_VRAM_DEVICE)
         self.unembedding = torch.nn.Linear(
             config.hidden_size,
             config.vocab_size,
             dtype=torch.bfloat16,
             bias=False,
-            device=device,
+            device=TORCH_VRAM_DEVICE,
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -129,24 +127,17 @@ class LazyTransformer(torch.nn.Module):
         return x
 
     @staticmethod
-    def from_model_type(
-        model_type: ModelType, device: str | torch.device
-    ) -> "LazyTransformer":
+    def from_model_type(model_type: ModelType) -> "LazyTransformer":
         """
         Load transformer from model type with lazy loading.
 
         Args:
             model_type: Model type for automatic checkpoint path and config resolution
-            device: Target device
 
         Returns:
             LazyTransformer with lazy loading enabled
         """
-        if not isinstance(device, torch.device):
-            device = torch.device(device)
-
         # Auto-resolve checkpoint directory from model type
-
         checkpoint_dir = get_checkpoint_path(model_type)
 
         config_path = os.path.join(checkpoint_dir, "config.json")
@@ -154,12 +145,10 @@ class LazyTransformer(torch.nn.Module):
             json_config = json.load(f)
             model_config = ModelConfig(**json_config)
 
-        model = LazyTransformer(
-            config=model_config, model_type=model_type, device=device
-        )
+        model = LazyTransformer(config=model_config, model_type=model_type)
         model.eval()
 
-        checkpoint = Checkpoint(checkpoint_dir, device)
+        checkpoint = Checkpoint(checkpoint_dir, TORCH_VRAM_DEVICE)
 
         for name, param in model.named_parameters():
             # Skip MLP expert weights (they'll be loaded lazily)
@@ -197,8 +186,8 @@ class LazyTokenGenerator:
             device: Target device for inference
         """
         self.device = device
-        self.model = LazyTransformer.from_model_type(model_type, device=device)
-        # Move model to device after creation
+        self.model = LazyTransformer.from_model_type(model_type)
+        # Move model to device after creation (components already on TORCH_VRAM_DEVICE)
         self.model = self.model.to(device)
 
     @torch.inference_mode()

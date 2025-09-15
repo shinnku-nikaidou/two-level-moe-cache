@@ -7,7 +7,7 @@ cache implementations with appropriate configuration and dependencies.
 
 from typing import Optional, Dict, Any
 from ...config.cache_config import CacheConfig
-from ...domain.cache.interfaces.expert_cache import IExpertCache
+from ...domain.cache.interfaces.expert_cache import IExpertCacheManager
 from ...domain.cache.interfaces.memory_tier import IMemoryTierManager
 from ...domain.manager.lru_expert_cache import LRUExpertCacheManager
 from ...domain.manager.direct_vram_cache import DirectVRAMExpertCache
@@ -40,7 +40,7 @@ class ExpertCacheFactory:
         model_type: ModelType,
         config: Optional[CacheConfig] = None,
         tier_manager: Optional[IMemoryTierManager] = None,
-    ) -> IExpertCache:
+    ) -> IExpertCacheManager:
         """
         Create an LRU-based expert cache.
 
@@ -74,7 +74,7 @@ class ExpertCacheFactory:
     def create_direct_vram_cache(
         cls,
         model_type: ModelType,
-    ) -> IExpertCache:
+    ) -> IExpertCacheManager:
         """
         Create a direct VRAM cache for use-and-delete strategy.
 
@@ -98,7 +98,7 @@ class ExpertCacheFactory:
         config: Optional[CacheConfig] = None,
         tier_manager_type: str = "set_based",
         **kwargs,
-    ) -> IExpertCache:
+    ) -> IExpertCacheManager:
         """
         Create an expert cache of specified type.
 
@@ -162,7 +162,7 @@ class ExpertCacheFactory:
             )
 
     @classmethod
-    def create_from_config(cls, config: CacheConfig, **kwargs) -> IExpertCache:
+    def create_from_config(cls, config: CacheConfig, **kwargs) -> IExpertCacheManager:
         """
         Create expert cache from configuration object.
 
@@ -227,7 +227,7 @@ class ExpertCacheFactory:
             name: Name for the implementation
             implementation: Cache class implementing IExpertCache
         """
-        if not issubclass(implementation, IExpertCache):
+        if not issubclass(implementation, IExpertCacheManager):
             raise ValueError(f"Implementation must inherit from IExpertCache")
 
         cls._cache_implementations[name] = implementation

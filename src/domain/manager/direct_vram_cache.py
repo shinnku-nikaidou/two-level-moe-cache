@@ -8,13 +8,13 @@ No persistence, no LRU management - maximum simplicity for maximum performance.
 
 import torch
 from typing import Dict, List, Optional, Any
-from ..cache.interfaces.expert_cache import IExpertCache
+from ..cache.interfaces.expert_cache import IExpertCacheManager
 from ..cache.entities.expert import Expert
 from ..cache.entities.types import ExpertKey, MemoryTier
 from ...domain import ModelType
 
 
-class DirectVRAMExpertCache(IExpertCache):
+class DirectVRAMExpertCache(IExpertCacheManager):
     """
     Direct VRAM loading cache with immediate cleanup.
 

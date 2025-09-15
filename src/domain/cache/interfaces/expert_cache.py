@@ -11,7 +11,7 @@ from ..entities.expert import Expert
 from ..entities.types import ExpertKey
 
 
-class IExpertCache(ABC):
+class IExpertCacheManager(ABC):
     """
     Abstract interface for expert weight caching system.
 
