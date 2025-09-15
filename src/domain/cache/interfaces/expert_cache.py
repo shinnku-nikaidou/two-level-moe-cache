@@ -5,12 +5,15 @@ This module defines the contract for caching and managing expert weights
 with automatic memory management and tier coordination.
 """
 
+import os
+import json
 from abc import ABC, abstractmethod
 from typing import Dict, List
 from ..entities.expert import Expert
 from ..entities.types import ExpertKey, ExpertParamType
 from src.domain import ModelType
 from src.boilerplate.gpt_oss.model import ModelConfig
+from src.config.util import get_checkpoint_path
 
 
 class IExpertCacheManager(ABC):
@@ -31,12 +34,36 @@ class IExpertCacheManager(ABC):
         super().__init__()
         self._model_type = model_type
 
-        # Get model configuration - for now hardcoded to GPT-OSS default
-        # TODO: Make this configurable per model_type in future
-        self._config = ModelConfig()
+        # Load model configuration from actual config.json file
+        self._config = self._load_model_config(model_type)
 
         # Pre-create all possible Expert instances based on model configuration
         self._experts: Dict[ExpertKey, Expert] = self._create_all_experts()
+
+    def _load_model_config(self, model_type: ModelType) -> ModelConfig:
+        """
+        Load model configuration from config.json file.
+
+        Args:
+            model_type: Model type for checkpoint path resolution
+
+        Returns:
+            ModelConfig loaded from the actual model's config.json
+        """
+        checkpoint_dir = get_checkpoint_path(model_type)
+        config_path = os.path.join(checkpoint_dir, "config.json")
+
+        if not os.path.exists(config_path):
+            print(f"⚠️ Config file not found at {config_path}, using defaults")
+            return ModelConfig()
+
+        try:
+            with open(config_path, "r") as f:
+                json_config = json.load(f)
+                return ModelConfig(**json_config)
+        except Exception as e:
+            print(f"⚠️ Failed to load config from {config_path}: {e}, using defaults")
+            return ModelConfig()
 
     def _create_all_experts(self) -> Dict[ExpertKey, Expert]:
         """

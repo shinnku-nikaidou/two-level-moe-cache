@@ -11,6 +11,7 @@ from src.domain.cache.interfaces.expert_cache import IExpertCacheManager
 from src.domain.cache.interfaces.memory_tier import IMemoryTierManager
 from src.domain.manager.lru import LRUExpertCacheManager
 from src.domain.manager.direct_nvme import DirectNVMEExpertCacheManager
+from src.domain.manager.direct_ram import DirectRAMExpertCacheManager
 from src.domain.manager.memory_tier import SetBasedMemoryTierManager
 from src.domain import ModelType
 
@@ -27,6 +28,7 @@ class ExpertCacheFactory:
     _cache_implementations: Dict[str, type] = {
         "lru": LRUExpertCacheManager,
         "direct_vram": DirectNVMEExpertCacheManager,
+        "direct_ram": DirectRAMExpertCacheManager,
     }
 
     @classmethod
@@ -81,3 +83,28 @@ class ExpertCacheFactory:
             Direct VRAM expert cache
         """
         return DirectNVMEExpertCacheManager(model_type=model_type)
+
+    @classmethod
+    def create_direct_ram_cache_manager(
+        cls,
+        model_type: ModelType,
+    ) -> IExpertCacheManager:
+        """
+        Create a pre-warmed RAM cache for maximum inference performance.
+
+        This creates a cache that loads ALL experts to RAM during initialization,
+        then provides ultra-fast RAM-to-VRAM copying during inference.
+        No disk I/O during get() operations - maximum speed at the cost of
+        high RAM usage and longer initialization time.
+
+        Args:
+            model_type: Type of model for expert loading
+
+        Returns:
+            Pre-warmed DirectRAM expert cache
+
+        Note:
+            This will consume significant RAM and take time to initialize,
+            but provides the fastest possible inference performance.
+        """
+        return DirectRAMExpertCacheManager(model_type=model_type)
