@@ -1,7 +1,6 @@
 import torch
 from typing import Dict, List, Any
 from ..cache.interfaces.expert_cache import IExpertCacheManager
-from ..cache.entities.expert import Expert
 from ..cache.entities.types import ExpertKey, ExpertParamType
 
 
@@ -90,12 +89,3 @@ class LazyExpertTensor:
         )
 
         return result
-
-    def get_cache_stats(self) -> Dict[str, Any]:
-        """
-        Get cache statistics for this tensor.
-
-        Returns:
-            Dictionary with cache performance metrics
-        """
-        return self.expert_cache.get_cache_stats()

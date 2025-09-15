@@ -7,7 +7,7 @@ managing expert weights with automatic memory tier coordination and eviction.
 
 import torch
 from collections import OrderedDict
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 from ..cache.interfaces.expert_cache import IExpertCacheManager
 from ..cache.interfaces.memory_tier import IMemoryTierManager
 from ..cache.entities.expert import Expert
@@ -246,25 +246,6 @@ class LRUExpertCacheManager(IExpertCacheManager):
         self._experts.clear()
         self._tier_manager.clear_tier(MemoryTier.VRAM)
         self._tier_manager.clear_tier(MemoryTier.RAM)
-
-    def get_cache_stats(self) -> Dict[str, Any]:
-        """
-        Get cache performance statistics.
-
-        Returns:
-            Dictionary containing cache statistics
-        """
-        total_requests = self._stats["hits"] + self._stats["misses"]
-        hit_rate = self._stats["hits"] / total_requests if total_requests > 0 else 0.0
-
-        return {
-            **self._stats,
-            "hit_rate": hit_rate,
-            "cache_size": len(self._experts),
-            "vram_experts": self._tier_manager.get_tier_size(MemoryTier.VRAM),
-            "ram_experts": self._tier_manager.get_tier_size(MemoryTier.RAM),
-            "disk_experts": self._tier_manager.get_tier_size(MemoryTier.DISK),
-        }
 
     def _load_expert(self, key: ExpertKey) -> Expert:
         """

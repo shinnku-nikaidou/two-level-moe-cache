@@ -225,19 +225,6 @@ class DirectVRAMExpertCache(IExpertCacheManager):
         """
         self.unload_all()
 
-    def get_cache_stats(self) -> Dict[str, Any]:
-        """
-        Get cache performance statistics.
-
-        Returns:
-            Dictionary containing cache statistics
-        """
-        return {
-            **self._stats,
-            "currently_loaded": len(self._loaded_experts),
-            "memory_usage_mb": self._estimate_memory_usage(),
-        }
-
     def _load_expert_to_vram(self, key: ExpertKey) -> Expert:
         """
         Load an expert directly to VRAM.

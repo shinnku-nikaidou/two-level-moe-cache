@@ -6,7 +6,7 @@ with automatic memory management and tier coordination.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Any
+from typing import List
 from ..entities.expert import Expert
 from ..entities.types import ExpertKey
 
@@ -140,15 +140,5 @@ class IExpertCacheManager(ABC):
     def clear(self) -> None:
         """
         Clear all experts from the cache.
-        """
-        pass
-
-    @abstractmethod
-    def get_cache_stats(self) -> Dict[str, Any]:
-        """
-        Get cache performance statistics.
-
-        Returns:
-            Dictionary containing cache statistics like hit rate, eviction count, etc.
         """
         pass
