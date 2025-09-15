@@ -82,7 +82,7 @@ class LRUExpertCacheManager(IExpertCacheManager):
         # Cache miss: load expert
         self._stats["misses"] += 1
         expert = self._load_expert(key)
-        self.put(key, expert)
+        self._put(key, expert)
         return expert
 
     def get_batch(self, keys: List[ExpertKey]) -> List[Expert]:
@@ -123,7 +123,7 @@ class LRUExpertCacheManager(IExpertCacheManager):
         # Load missing experts in batch
         for key in missing_keys:
             expert = self._load_expert(key)
-            self.put(key, expert)
+            self._put(key, expert)
             experts_dict[key] = expert
 
         # IMPORTANT: Ensure all experts in batch are on same device for consistency
@@ -135,9 +135,19 @@ class LRUExpertCacheManager(IExpertCacheManager):
 
         return result
 
-    def put(self, key: ExpertKey, expert: Expert) -> None:
+    def clear(self) -> None:
         """
-        Store an expert in the cache with LRU eviction.
+        Clear all experts from the cache.
+        """
+        # Clear experts
+        self._experts.clear()
+        
+        # Reset stats
+        self._stats["evictions"] = 0
+
+    def _put(self, key: ExpertKey, expert: Expert) -> None:
+        """
+        Internal method to store an expert in the cache with LRU eviction.
 
         Args:
             key: Expert identifier
@@ -158,9 +168,9 @@ class LRUExpertCacheManager(IExpertCacheManager):
         # Trigger eviction if necessary
         self._enforce_capacity_limits()
 
-    def evict(self, key: ExpertKey) -> bool:
+    def _evict(self, key: ExpertKey) -> bool:
         """
-        Remove an expert from the cache.
+        Internal method to remove an expert from the cache.
 
         Args:
             key: Expert identifier to evict
@@ -186,66 +196,6 @@ class LRUExpertCacheManager(IExpertCacheManager):
 
         self._stats["evictions"] += 1
         return True
-
-    def evict_batch(self, keys: List[ExpertKey]) -> int:
-        """
-        Remove multiple experts from the cache.
-
-        Args:
-            keys: List of expert identifiers to evict
-
-        Returns:
-            Number of experts actually evicted
-        """
-        evicted_count = 0
-        for key in keys:
-            if self.evict(key):
-                evicted_count += 1
-        return evicted_count
-
-    def contains(self, key: ExpertKey) -> bool:
-        """
-        Check if an expert is currently cached.
-
-        Args:
-            key: Expert identifier to check
-
-        Returns:
-            True if expert is cached, False otherwise
-        """
-        return key in self._experts
-
-    def get_cached_keys(self) -> List[ExpertKey]:
-        """
-        Get all expert keys currently cached.
-
-        Returns:
-            List of all cached expert keys in LRU order
-        """
-        return list(self._experts.keys())
-
-    def get_cache_size(self) -> int:
-        """
-        Get the current number of cached experts.
-
-        Returns:
-            Number of experts in cache
-        """
-        return len(self._experts)
-
-    def clear(self) -> None:
-        """
-        Clear all experts from the cache.
-        """
-        # Move all experts to disk
-        for key, expert in self._experts.items():
-            if expert.current_tier != MemoryTier.DISK:
-                expert.unload()  # Move to disk by unloading
-
-        # Clear cache and tier tracking
-        self._experts.clear()
-        self._tier_manager.clear_tier(MemoryTier.VRAM)
-        self._tier_manager.clear_tier(MemoryTier.RAM)
 
     def _load_expert(self, key: ExpertKey) -> Expert:
         """
@@ -340,7 +290,7 @@ class LRUExpertCacheManager(IExpertCacheManager):
 
             # Move to disk and remove from cache
             for key in lru_experts:
-                self.evict(key)
+                self._evict(key)
 
     def _ensure_batch_device_consistency(
         self, expert_dict: Dict[ExpertKey, Expert]

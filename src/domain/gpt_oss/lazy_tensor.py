@@ -1,5 +1,5 @@
 import torch
-from typing import Dict, List, Any
+from typing import List
 from ..cache.interfaces.expert_cache import IExpertCacheManager
 from ..cache.entities.types import ExpertKey, ExpertParamType
 
@@ -15,9 +15,9 @@ class LazyExpertTensor:
 
     def __init__(
         self,
-        expert_cache: IExpertCacheManager,
+        expert_cache_manager: IExpertCacheManager,
         layer_idx: int,
-        param_type: ExpertParamType,  # Use existing ExpertParamType enum
+        param_type: ExpertParamType,
         expected_shape: tuple,
         dtype: torch.dtype,
         device: torch.device,
@@ -33,7 +33,7 @@ class LazyExpertTensor:
             dtype: Target data type for loaded tensors
             device: Target device for loaded tensors
         """
-        self.expert_cache = expert_cache
+        self.expert_cache_manager = expert_cache_manager
         self.layer_idx = layer_idx
         self.param_type = param_type
         self.expected_shape = expected_shape
@@ -75,7 +75,7 @@ class LazyExpertTensor:
                 expert_keys.append(self._expert_keys[expert_id])
 
         # Batch load experts
-        experts = self.expert_cache.get_batch(expert_keys)
+        experts = self.expert_cache_manager.get_batch(expert_keys)
 
         # Direct result construction with null check
         expert_tensors = []

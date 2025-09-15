@@ -60,7 +60,7 @@ class LazyMLPBlock(torch.nn.Module):
         intermediate_size = self.config.intermediate_size
 
         self.mlp1_weight = LazyExpertTensor(
-            expert_cache=self.expert_cache,
+            expert_cache_manager=self.expert_cache,
             layer_idx=self.layer_idx,
             param_type=ExpertParamType.MLP1_WEIGHT,
             expected_shape=(
@@ -73,7 +73,7 @@ class LazyMLPBlock(torch.nn.Module):
         )
 
         self.mlp1_bias = LazyExpertTensor(
-            expert_cache=self.expert_cache,
+            expert_cache_manager=self.expert_cache,
             layer_idx=self.layer_idx,
             param_type=ExpertParamType.MLP1_BIAS,
             expected_shape=(self.num_experts, intermediate_size * 2),
@@ -83,7 +83,7 @@ class LazyMLPBlock(torch.nn.Module):
 
         # MLP2 (down) tensors
         self.mlp2_weight = LazyExpertTensor(
-            expert_cache=self.expert_cache,
+            expert_cache_manager=self.expert_cache,
             layer_idx=self.layer_idx,
             param_type=ExpertParamType.MLP2_WEIGHT,
             expected_shape=(
@@ -96,7 +96,7 @@ class LazyMLPBlock(torch.nn.Module):
         )
 
         self.mlp2_bias = LazyExpertTensor(
-            expert_cache=self.expert_cache,
+            expert_cache_manager=self.expert_cache,
             layer_idx=self.layer_idx,
             param_type=ExpertParamType.MLP2_BIAS,
             expected_shape=(self.num_experts, self.config.hidden_size),

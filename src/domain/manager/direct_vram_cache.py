@@ -94,7 +94,7 @@ class DirectVRAMExpertCache(IExpertCacheManager):
 
         # AUTO-CLEANUP: Unload all previously loaded experts first
         # This ensures maximum memory efficiency with no manual management needed
-        self.unload_all()
+        self._clear_all()
 
         result = []
 
@@ -109,23 +109,25 @@ class DirectVRAMExpertCache(IExpertCacheManager):
 
         return result
 
-    def put(self, key: ExpertKey, expert: Expert) -> None:
+    def clear(self) -> None:
         """
-        Store an expert (no-op for direct cache).
-
-        This method exists for interface compatibility but does nothing
-        since DirectVRAMCache doesn't persist experts.
-
-        Args:
-            key: Expert identifier
-            expert: Expert instance (ignored)
+        Clear all experts from VRAM.
         """
-        # No-op: direct cache doesn't store experts
-        pass
+        self._clear_all()
 
-    def evict(self, key: ExpertKey) -> bool:
+    def _clear_all(self) -> int:
         """
-        Remove an expert from VRAM immediately.
+        Internal method to unload all currently loaded experts.
+
+        Returns:
+            Number of experts unloaded
+        """
+        all_keys = list(self._loaded_experts.keys())
+        return self._evict_batch(all_keys)
+
+    def _evict(self, key: ExpertKey) -> bool:
+        """
+        Internal method to remove an expert from VRAM immediately.
 
         Args:
             key: Expert identifier to unload
@@ -142,88 +144,25 @@ class DirectVRAMExpertCache(IExpertCacheManager):
 
         return True
 
-    def evict_batch(self, keys: List[ExpertKey]) -> int:
+    def _evict_batch(self, keys: List[ExpertKey]) -> int:
         """
-        Remove multiple experts from VRAM immediately.
+        Internal method to remove multiple experts from VRAM immediately.
 
         Args:
-            keys: List of expert identifiers to unload
+            keys: List of expert identifiers to evict
 
         Returns:
-            Number of experts actually unloaded
+            Number of experts actually evicted
         """
         unloaded_count = 0
         for key in keys:
-            if self.evict(key):
+            if self._evict(key):
                 unloaded_count += 1
 
         if unloaded_count > 0:
             self._stats["batch_unloads"] += 1
 
         return unloaded_count
-
-    def unload_batch(self, keys: List[ExpertKey]) -> int:
-        """
-        Immediate cleanup method for batch unloading after forward pass.
-
-        This is the key method for "use-and-delete" strategy.
-        Call this immediately after using experts in forward pass.
-
-        Args:
-            keys: List of expert identifiers to unload
-
-        Returns:
-            Number of experts actually unloaded
-        """
-        return self.evict_batch(keys)
-
-    def unload_all(self) -> int:
-        """
-        Unload all currently loaded experts.
-
-        Useful for cleanup at end of generation or error handling.
-
-        Returns:
-            Number of experts unloaded
-        """
-        all_keys = list(self._loaded_experts.keys())
-        return self.unload_batch(all_keys)
-
-    def contains(self, key: ExpertKey) -> bool:
-        """
-        Check if an expert is currently loaded in VRAM.
-
-        Args:
-            key: Expert identifier to check
-
-        Returns:
-            True if expert is currently loaded in VRAM
-        """
-        return key in self._loaded_experts
-
-    def get_cached_keys(self) -> List[ExpertKey]:
-        """
-        Get all expert keys currently loaded in VRAM.
-
-        Returns:
-            List of all currently loaded expert keys
-        """
-        return list(self._loaded_experts.keys())
-
-    def get_cache_size(self) -> int:
-        """
-        Get the current number of loaded experts.
-
-        Returns:
-            Number of experts currently in VRAM
-        """
-        return len(self._loaded_experts)
-
-    def clear(self) -> None:
-        """
-        Clear all experts from VRAM.
-        """
-        self.unload_all()
 
     def _load_expert_to_vram(self, key: ExpertKey) -> Expert:
         """
