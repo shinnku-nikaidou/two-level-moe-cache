@@ -9,7 +9,7 @@ edition = "2024"
 [workspace.dependencies]
 
 # Python bindings
-pyo3 = { version = "0.26", features = ["auto-initialize"] }
+pyo3 = { version = "0.26", features = ["auto-initialize", "extension-module"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
