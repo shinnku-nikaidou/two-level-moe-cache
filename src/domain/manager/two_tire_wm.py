@@ -38,9 +38,8 @@ class TwoTireWmExpertCacheManager(IExpertCacheManager):
     def __init__(
         self,
         model_type: ModelType,
-        vram_capacity_mb: int = 512,
-        ram_capacity_mb: int = 2048,
-        **kwargs,
+        vram_capacity_mb: int = 5120,
+        ram_capacity_mb: int = 20480,
     ):
         """
         Initialize two-tier watermark cache manager.
@@ -49,7 +48,6 @@ class TwoTireWmExpertCacheManager(IExpertCacheManager):
             model_type: Type of model for configuration
             vram_capacity_mb: VRAM capacity limit in MB
             ram_capacity_mb: RAM capacity limit in MB
-            **kwargs: Additional configuration parameters
         """
         super().__init__(model_type)
 
@@ -62,9 +60,6 @@ class TwoTireWmExpertCacheManager(IExpertCacheManager):
             vram_capacity_mb * 1024 * 1024,
             ram_capacity_mb * 1024 * 1024,
         )
-
-        # Cache for tracking accessed experts
-        self._accessed_experts = set()
 
     def update_activations(self, activated_experts: List[int]) -> None:
         """
@@ -94,10 +89,6 @@ class TwoTireWmExpertCacheManager(IExpertCacheManager):
 
         # Get the Python Expert instance and update it
         expert = self._get_expert(key)
-        self._sync_expert_from_rust(expert, rust_expert_ref)
-
-        # Track access
-        self._accessed_experts.add(key)
 
         return expert
 
@@ -114,7 +105,6 @@ class TwoTireWmExpertCacheManager(IExpertCacheManager):
         Raises:
             KeyError: If any expert cannot be loaded
         """
-        # Note: Rust implementation doesn't have get_batch, use sequential calls
         experts = []
         for key in keys:
             expert = self.get(key)
@@ -122,30 +112,13 @@ class TwoTireWmExpertCacheManager(IExpertCacheManager):
         return experts
 
     def clear(self) -> None:
-        """Clear all cached experts and reset state (simplified implementation)."""
-        # Note: Rust implementation doesn't have explicit clear method
-        # Reset our tracking
-        self._accessed_experts.clear()
+        """Clear all cached experts and reset state"""
+        ...
 
     def next(self) -> None:
         """Advance to next time step and apply watermark decisions."""
         # Use step_forward which is the actual method in Rust implementation
         self._rust_cache.step_forward()
-
-    def get_watermark_stats(self) -> Dict[str, Any]:
-        """
-        Get watermark statistics for monitoring and debugging.
-
-        Returns:
-            Dictionary with watermark values, capacity usage, and other stats
-        """
-        # Get stats from the Rust implementation
-        stats = self._rust_cache.get_stats()
-
-        # Add our Python-side tracking info
-        stats["accessed_experts_count"] = len(self._accessed_experts)
-
-        return stats
 
     # Private helper methods
     def _python_to_rust_key(self, key: ExpertKey) -> RustExpertKey:
@@ -181,18 +154,3 @@ class TwoTireWmExpertCacheManager(IExpertCacheManager):
     def _expert_key_to_string(self, key: ExpertKey) -> str:
         """Convert ExpertKey to string format expected by Rust."""
         return f"L{key.layer_idx}_E{key.expert_id}_{key.param_type}"
-
-    def _sync_expert_from_rust(self, expert: Expert, rust_ref: RustExpertRef) -> None:
-        """Synchronize Python Expert state from Rust reference."""
-        # For the simplified implementation, we don't actually sync the expert state
-        # since that would require actual tensor loading/moving operations.
-        # The Rust reference contains tier information that's used for caching decisions,
-        # but the Python Expert maintains its own tier based on actual tensor data presence.
-
-        # In a full implementation, we would:
-        # - Check rust_ref.tier to determine target location
-        # - Load/move tensor data accordingly using expert.load_to_ram(), expert.load_to_vram(), etc.
-        # - Update expert's memory usage tracking
-
-        # For now, this is a no-op since we're demonstrating the architecture pattern
-        pass

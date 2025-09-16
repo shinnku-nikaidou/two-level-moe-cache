@@ -6,8 +6,6 @@
 use policy::{ExpertKey as PolicyExpertKey, ExpertParamType};
 use std::collections::HashMap;
 
-use super::manager::TwoTireWmExpertCacheManager;
-
 /// Mock EWMA prediction and cache decision logic
 pub fn get_cache_decision(
     mock_ewma_probs: &mut HashMap<PolicyExpertKey, f64>,
@@ -44,23 +42,4 @@ pub fn update_activations(
 
         mock_ewma_probs.insert(policy_key, new_prob);
     }
-}
-
-/// Mock statistics generation
-pub fn get_stats(manager: &TwoTireWmExpertCacheManager) -> HashMap<String, f64> {
-    let mut stats = HashMap::new();
-
-    // Mock watermark values (real implementation would get from policy layer)
-    stats.insert("vram_watermark".to_string(), 0.75);
-    stats.insert("ram_watermark".to_string(), 0.25);
-
-    // Timing info
-    stats.insert("current_time".to_string(), manager.current_time() as f64);
-    stats.insert("current_layer".to_string(), manager.current_layer() as f64);
-    stats.insert(
-        "total_experts_tracked".to_string(),
-        manager.mock_ewma_probs.len() as f64,
-    );
-
-    stats
 }

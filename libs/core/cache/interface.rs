@@ -4,7 +4,6 @@
 //! for the TwoTireWmExpertCacheManager.
 
 use pyo3::prelude::*;
-use std::collections::HashMap;
 
 use policy::{ExpertKey as PolicyExpertKey, ExpertParamType};
 
@@ -65,10 +64,5 @@ impl TwoTireWmExpertCacheManager {
         self.current_time += 1;
         self.current_layer = (self.current_layer + 1) % self.total_layers;
         Ok(())
-    }
-
-    /// Get current statistics from policy components (mock implementation)
-    pub fn get_stats(&self) -> HashMap<String, f64> {
-        mock::get_stats(self)
     }
 }

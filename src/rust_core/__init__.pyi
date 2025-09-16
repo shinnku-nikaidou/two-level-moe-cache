@@ -4,7 +4,7 @@ Type stubs for Rust core library exports.
 This file provides type hints for Pylance/mypy to understand the Rust-exported classes.
 """
 
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from enum import IntEnum
 
 class MemoryTier(IntEnum):
@@ -81,9 +81,8 @@ class TwoTireWmExpertCacheManager:
         model_type: str,  # ModelType string
         total_layers: int,
         vram_capacity: int,  # Capacity in bytes
-        ram_capacity: int,   # Capacity in bytes
+        ram_capacity: int,  # Capacity in bytes
     ) -> None: ...
-    
     def get(self, expert_key: ExpertKey) -> ExpertRef:
         """Get a single expert by key, loading if necessary."""
         ...
@@ -94,8 +93,4 @@ class TwoTireWmExpertCacheManager:
 
     def step_forward(self) -> None:
         """Advance to next time step."""
-        ...
-
-    def get_stats(self) -> Dict[str, float]:
-        """Get statistics for analysis."""
         ...
