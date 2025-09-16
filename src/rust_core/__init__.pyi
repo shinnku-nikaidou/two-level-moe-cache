@@ -4,7 +4,7 @@ Type stubs for Rust core library exports.
 This file provides type hints for Pylance/mypy to understand the Rust-exported classes.
 """
 
-from typing import Dict, List, Optional, Tuple, Any, Union
+from typing import Dict, List, Optional, Tuple
 from enum import IntEnum
 
 class MemoryTier(IntEnum):
@@ -113,19 +113,3 @@ class TwoTireWmExpertCacheManager:
     def get_stats(self) -> Dict[str, float]:
         """Get statistics for analysis."""
         ...
-
-# Legacy exports for backwards compatibility
-def add(left: int, right: int) -> int:
-    """Add two integers."""
-    ...
-
-def get_version() -> str:
-    """Get library version."""
-    ...
-
-class PyCoreCache:
-    """Legacy cache class."""
-
-    def __init__(self) -> None: ...
-    def get(self, key: str) -> Optional[str]: ...
-    def set(self, key: str, value: str) -> None: ...
