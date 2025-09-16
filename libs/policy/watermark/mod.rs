@@ -2,7 +2,7 @@
 
 //!
 //! This module implements the dual watermark algorithm for two-tier expert caching.
-//! It manages VRAM and RAM tiers using adaptive watermark thresholds based on 
+//! It manages VRAM and RAM tiers using adaptive watermark thresholds based on
 //! benefit density calculations.
 //!
 //! ## Algorithm Overview
@@ -52,6 +52,6 @@ pub mod algorithm;
 pub mod config;
 pub mod error;
 
-pub use algorithm::{WatermarkAlgorithm, CacheDecision, MemoryTier, ExpertState};
+pub use algorithm::{CacheDecision, ExpertState, MemoryTier, WatermarkAlgorithm};
 pub use config::{WatermarkConfig, WatermarkConfigError};
 pub use error::WatermarkError;

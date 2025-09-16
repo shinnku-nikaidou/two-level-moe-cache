@@ -9,10 +9,10 @@ pub mod watermark;
 /// Expert parameter type for MoE expert weights
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ExpertParamType {
-    MLP1Weight,  // First MLP layer weights (up projection)
-    MLP1Bias,    // First MLP layer bias
-    MLP2Weight,  // Second MLP layer weights (down projection) 
-    MLP2Bias,    // Second MLP layer bias
+    MLP1Weight, // First MLP layer weights (up projection)
+    MLP1Bias,   // First MLP layer bias
+    MLP2Weight, // Second MLP layer weights (down projection)
+    MLP2Bias,   // Second MLP layer bias
 }
 
 impl ExpertParamType {
@@ -41,8 +41,8 @@ impl ExpertParamType {
 /// Uses 0-based indexing consistent with our implementation convention
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ExpertKey {
-    pub expert_id: usize,           // Expert index within the layer (0-based)
-    pub layer_id: usize,            // Layer index in the model (0-based)
+    pub expert_id: usize,            // Expert index within the layer (0-based)
+    pub layer_id: usize,             // Layer index in the model (0-based)
     pub param_type: ExpertParamType, // Parameter type within the expert
 }
 

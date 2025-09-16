@@ -8,10 +8,10 @@
 pub struct FusionConfig {
     /// η parameter for EWMA-ScoutGate blending (0.0 = pure EWMA, 1.0 = pure ScoutGate)
     pub eta: f64,
-    
+
     /// γ parameter for reuse distance decay in forward-causal weights
     pub gamma: f64,
-    
+
     /// Total number of layers in the model (for reuse distance calculation)
     pub total_layers: usize,
 }
@@ -31,8 +31,8 @@ impl FusionConfig {
     /// Create default configuration suitable for most use cases
     pub fn default() -> Self {
         Self {
-            eta: 0.5,     // Equal weighting of EWMA and ScoutGate
-            gamma: 0.1,   // Moderate decay for forward-causal weights
+            eta: 0.5,         // Equal weighting of EWMA and ScoutGate
+            gamma: 0.1,       // Moderate decay for forward-causal weights
             total_layers: 24, // Default for GPT-OSS-20B
         }
     }
@@ -72,15 +72,15 @@ impl FusionConfig {
         if !(0.0..=1.0).contains(&self.eta) {
             return Err(FusionConfigError::InvalidEta(self.eta));
         }
-        
+
         if self.gamma <= 0.0 {
             return Err(FusionConfigError::InvalidGamma(self.gamma));
         }
-        
+
         if self.total_layers == 0 {
             return Err(FusionConfigError::InvalidLayers(self.total_layers));
         }
-        
+
         Ok(())
     }
 }
@@ -90,10 +90,10 @@ impl FusionConfig {
 pub enum FusionConfigError {
     /// Invalid eta parameter (must be in [0,1])
     InvalidEta(f64),
-    
+
     /// Invalid gamma parameter (must be > 0)
     InvalidGamma(f64),
-    
+
     /// Invalid total layers (must be > 0)
     InvalidLayers(usize),
 }

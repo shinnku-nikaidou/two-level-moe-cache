@@ -11,9 +11,9 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::{ExpertKey, ExpertParamType};
 use crate::constants::models::ModelConfig;
 use crate::timer::Timer;
+use crate::{ExpertKey, ExpertParamType};
 
 use super::config::ScoutGateConfig;
 use super::error::ScoutGateError;

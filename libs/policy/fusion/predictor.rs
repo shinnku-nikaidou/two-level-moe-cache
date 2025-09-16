@@ -9,9 +9,9 @@
 
 use std::collections::HashMap;
 
-use crate::ExpertKey;
 use super::config::FusionConfig;
 use super::error::FusionError;
+use crate::ExpertKey;
 
 /// Probability fusion predictor
 ///
@@ -84,7 +84,10 @@ impl ProbabilityFusion {
         for expert_key in all_keys {
             // Get individual predictions (default to 0.0 if missing)
             let ewma_prob = ewma_predictions.get(expert_key).copied().unwrap_or(0.0);
-            let scoutgate_prob = scoutgate_predictions.get(expert_key).copied().unwrap_or(0.0);
+            let scoutgate_prob = scoutgate_predictions
+                .get(expert_key)
+                .copied()
+                .unwrap_or(0.0);
 
             // Validate probability values
             self.validate_probability(*expert_key, ewma_prob)?;
@@ -169,7 +172,11 @@ impl ProbabilityFusion {
     // Private helper methods
 
     /// Validate that a probability value is in [0, 1]
-    fn validate_probability(&self, expert_key: ExpertKey, probability: f64) -> Result<(), FusionError> {
+    fn validate_probability(
+        &self,
+        expert_key: ExpertKey,
+        probability: f64,
+    ) -> Result<(), FusionError> {
         if !(0.0..=1.0).contains(&probability) {
             return Err(FusionError::InvalidProbability {
                 expert_key: format!("{:?}", expert_key),
@@ -216,13 +223,13 @@ mod tests {
 
         let mut ewma_preds = HashMap::new();
         let mut sg_preds = HashMap::new();
-        
+
         let expert_key = ExpertKey::expert_level(0, 0);
         ewma_preds.insert(expert_key, 0.8);
         sg_preds.insert(expert_key, 0.2);
 
         let result = fusion.fuse_predictions(&ewma_preds, &sg_preds, 0).unwrap();
-        
+
         // Base fusion: (1-0.3)*0.8 + 0.3*0.2 = 0.7*0.8 + 0.06 = 0.56 + 0.06 = 0.62
         // Causal weight for same layer (distance=0): e^(-0.1*0) = 1.0
         // Final: 0.62 * 1.0 = 0.62

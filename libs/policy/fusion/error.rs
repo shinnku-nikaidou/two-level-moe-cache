@@ -10,19 +10,19 @@ pub use super::config::FusionConfigError;
 pub enum FusionError {
     /// Configuration error
     Config(FusionConfigError),
-    
+
     /// Invalid current layer (must be < total_layers)
     InvalidCurrentLayer {
         current_layer: usize,
         total_layers: usize,
     },
-    
+
     /// Mismatched prediction maps (different expert keys)
     MismatchedPredictions {
         ewma_keys: usize,
         scoutgate_keys: usize,
     },
-    
+
     /// Invalid probability value (must be in [0,1])
     InvalidProbability {
         expert_key: String,
@@ -36,14 +36,35 @@ impl std::fmt::Display for FusionError {
             FusionError::Config(config_err) => {
                 write!(f, "Fusion configuration error: {}", config_err)
             }
-            FusionError::InvalidCurrentLayer { current_layer, total_layers } => {
-                write!(f, "Invalid current layer {} (must be < {})", current_layer, total_layers)
+            FusionError::InvalidCurrentLayer {
+                current_layer,
+                total_layers,
+            } => {
+                write!(
+                    f,
+                    "Invalid current layer {} (must be < {})",
+                    current_layer, total_layers
+                )
             }
-            FusionError::MismatchedPredictions { ewma_keys, scoutgate_keys } => {
-                write!(f, "Mismatched prediction maps: EWMA has {} keys, ScoutGate has {} keys", ewma_keys, scoutgate_keys)
+            FusionError::MismatchedPredictions {
+                ewma_keys,
+                scoutgate_keys,
+            } => {
+                write!(
+                    f,
+                    "Mismatched prediction maps: EWMA has {} keys, ScoutGate has {} keys",
+                    ewma_keys, scoutgate_keys
+                )
             }
-            FusionError::InvalidProbability { expert_key, probability } => {
-                write!(f, "Invalid probability {} for expert {} (must be in [0,1])", probability, expert_key)
+            FusionError::InvalidProbability {
+                expert_key,
+                probability,
+            } => {
+                write!(
+                    f,
+                    "Invalid probability {} for expert {} (must be in [0,1])",
+                    probability, expert_key
+                )
             }
         }
     }

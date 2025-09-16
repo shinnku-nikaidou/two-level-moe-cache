@@ -1,10 +1,10 @@
 use std::rc::Rc;
 
-use policy::{ExpertKey, ExpertParamType};
 use policy::ewma::config::EwmaConfig;
 use policy::ewma::error::EwmaError;
 use policy::ewma::predictor::EwmaPredictor;
 use policy::timer::Timer;
+use policy::{ExpertKey, ExpertParamType};
 
 fn create_test_timer() -> Rc<Timer> {
     Rc::new(Timer::new(4).unwrap()) // 4 layers for testing
