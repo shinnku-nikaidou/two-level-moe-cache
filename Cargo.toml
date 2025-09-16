@@ -1,5 +1,5 @@
 [workspace]
-members = ["libs/policy", "libs/backend", "libs/core"]
+members = ["libs/policy", "libs/core"]
 resolver = "3"
 
 [workspace.package]

@@ -8,11 +8,11 @@ cache implementations with appropriate configuration and dependencies.
 from typing import Optional, Dict
 from src.config.cache_config import CacheConfig
 from src.domain.cache.interfaces.expert_cache import IExpertCacheManager
-from src.domain.cache.interfaces.memory_tier import IMemoryTierManager
-from src.domain.manager.lru import LRUExpertCacheManager
-from src.domain.manager.direct_nvme import DirectNVMEExpertCacheManager
-from src.domain.manager.direct_ram import DirectRAMExpertCacheManager
-from src.domain.manager.memory_tier import SetBasedMemoryTierManager
+from src.domain.manager import (
+    LRUExpertCacheManager,
+    DirectNVMEExpertCacheManager, 
+    DirectRAMExpertCacheManager
+)
 from src.domain import ModelType
 
 
@@ -36,7 +36,6 @@ class ExpertCacheFactory:
         cls,
         model_type: ModelType,
         config: Optional[CacheConfig] = None,
-        tier_manager: Optional[IMemoryTierManager] = None,
     ) -> IExpertCacheManager:
         """
         Create an LRU-based expert cache.
@@ -44,7 +43,6 @@ class ExpertCacheFactory:
         Args:
             model_type: Type of model for configuration
             config: Cache configuration (optional)
-            tier_manager: Memory tier manager (optional)
         Returns:
             LRU expert cache manager
         """
@@ -52,14 +50,9 @@ class ExpertCacheFactory:
         if config is None:
             config = CacheConfig.for_model(model_type)
 
-        # Use provided tier manager or create default
-        if tier_manager is None:
-            tier_manager = SetBasedMemoryTierManager()
-
         # Create LRU cache with configuration
         return LRUExpertCacheManager(
             model_type=model_type,
-            memory_tier_manager=tier_manager,
             max_vram_experts=config.max_vram_experts,
             max_ram_experts=config.max_ram_experts,
         )

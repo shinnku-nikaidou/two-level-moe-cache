@@ -2,42 +2,37 @@
 LRU-based expert cache manager implementation.
 
 This module provides an LRU (Least Recently Used) cache implementation for
-managing expert weights with automatic memory tier coordination and eviction.
+managing expert weights with integrated memory tier tracking and eviction.
 """
 
 import torch
 from collections import OrderedDict
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 from ..cache.interfaces.expert_cache import IExpertCacheManager
-from ..cache.interfaces.memory_tier import IMemoryTierManager
 from ..cache.entities.expert import Expert
 from ..cache.entities.types import ExpertKey, MemoryTier
 from .. import ModelType
-from .memory_tier import SetBasedMemoryTierManager
 
 
 class LRUExpertCacheManager(IExpertCacheManager):
     """
-    LRU-based expert cache manager with automatic tier coordination.
+    LRU-based expert cache manager with integrated memory tier tracking.
 
-    This implementation maintains an LRU cache of expert instances while
-    coordinating with a memory tier manager to track expert positions
-    across VRAM, RAM, and DISK storage tiers.
+    This implementation maintains an LRU cache of expert instances with
+    built-in tracking of expert positions across VRAM, RAM, and DISK storage tiers.
     """
 
     def __init__(
         self,
         model_type: ModelType,
-        memory_tier_manager: Optional[IMemoryTierManager] = None,
         max_vram_experts: int = 8,
         max_ram_experts: int = 32,
     ):
         """
-        Initialize LRU expert cache manager with shared expert storage.
+        Initialize LRU expert cache manager with integrated tier tracking.
 
         Args:
             model_type: Model type for creating Expert instances
-            memory_tier_manager: Memory tier manager instance (creates default if None)
             max_vram_experts: Maximum experts to keep in VRAM before eviction
             max_ram_experts: Maximum experts to keep in RAM before eviction to disk
         """
@@ -46,9 +41,52 @@ class LRUExpertCacheManager(IExpertCacheManager):
 
         # LRU tracking of accessed experts (using keys, not Expert instances)
         self._access_order: OrderedDict[ExpertKey, None] = OrderedDict()
-        self._tier_manager = memory_tier_manager or SetBasedMemoryTierManager()
+
+        # Integrated memory tier tracking using sets
+        self._vram_experts: Set[ExpertKey] = set()
+        self._ram_experts: Set[ExpertKey] = set()
+        self._disk_experts: Set[ExpertKey] = set()
+
+        # Mapping for efficient tier lookup
+        self._tier_sets = {
+            MemoryTier.VRAM: self._vram_experts,
+            MemoryTier.RAM: self._ram_experts,
+            MemoryTier.DISK: self._disk_experts,
+        }
+
         self._max_vram_experts = max_vram_experts
         self._max_ram_experts = max_ram_experts
+
+    # Integrated memory tier management methods
+    def _add_to_tier(self, tier: MemoryTier, key: ExpertKey) -> None:
+        """Add an expert key to a specific memory tier."""
+        self._tier_sets[tier].add(key)
+
+    def _remove_from_tier(self, tier: MemoryTier, key: ExpertKey) -> None:
+        """Remove an expert key from a specific memory tier."""
+        self._tier_sets[tier].discard(key)  # discard() won't raise if key not present
+
+    def _move_between_tiers(
+        self, key: ExpertKey, from_tier: MemoryTier, to_tier: MemoryTier
+    ) -> None:
+        """Move an expert key between memory tiers atomically."""
+        self._tier_sets[from_tier].discard(key)
+        self._tier_sets[to_tier].add(key)
+
+    def _get_tier(self, key: ExpertKey) -> Optional[MemoryTier]:
+        """Get the current memory tier of an expert."""
+        for tier, expert_set in self._tier_sets.items():
+            if key in expert_set:
+                return tier
+        return None
+
+    def _get_experts_in_tier(self, tier: MemoryTier) -> Set[ExpertKey]:
+        """Get all expert keys currently in a specific tier."""
+        return self._tier_sets[tier].copy()
+
+    def _get_tier_size(self, tier: MemoryTier) -> int:
+        """Get the number of experts currently in a tier."""
+        return len(self._tier_sets[tier])
 
     def get(self, key: ExpertKey) -> Expert:
         """
@@ -142,7 +180,7 @@ class LRUExpertCacheManager(IExpertCacheManager):
         # Update tier tracking
         current_tier = expert.current_tier
         if current_tier:
-            self._tier_manager.add_to_tier(current_tier, key)
+            self._add_to_tier(current_tier, key)
 
         # Trigger eviction if necessary
         self._enforce_capacity_limits()
@@ -168,15 +206,15 @@ class LRUExpertCacheManager(IExpertCacheManager):
         expert = self._get_expert(key)
 
         # Remove from tier tracking
-        current_tier = self._tier_manager.get_tier(key)
+        current_tier = self._get_tier(key)
         if current_tier:
-            self._tier_manager.remove_from_tier(current_tier, key)
+            self._remove_from_tier(current_tier, key)
 
         # IMPORTANT: Do NOT unload the expert data here!
         # The expert instance might still be referenced elsewhere.
         # Just remove it from the cache and let garbage collection handle it.
         # Add to DISK tier tracking for consistency
-        self._tier_manager.add_to_tier(MemoryTier.DISK, key)
+        self._add_to_tier(MemoryTier.DISK, key)
 
         return True
 
@@ -197,13 +235,13 @@ class LRUExpertCacheManager(IExpertCacheManager):
         expert = Expert(expert_key=key, model_type=self._model_type)
 
         # Load to VRAM if space available, otherwise RAM
-        vram_count = self._tier_manager.get_tier_size(MemoryTier.VRAM)
+        vram_count = self._get_tier_size(MemoryTier.VRAM)
         if vram_count < self._max_vram_experts and torch.cuda.is_available():
             expert.nvme_to_vram()  # Load directly to VRAM
-            self._tier_manager.add_to_tier(MemoryTier.VRAM, key)
+            self._add_to_tier(MemoryTier.VRAM, key)
         else:
             expert.nvme_to_ram()  # Load to RAM
-            self._tier_manager.add_to_tier(MemoryTier.RAM, key)
+            self._add_to_tier(MemoryTier.RAM, key)
 
         return expert
 
@@ -216,24 +254,22 @@ class LRUExpertCacheManager(IExpertCacheManager):
             expert: Expert instance to check/promote
         """
         current_tier = expert.current_tier
-        vram_count = self._tier_manager.get_tier_size(MemoryTier.VRAM)
+        vram_count = self._get_tier_size(MemoryTier.VRAM)
 
         # If expert is not loaded anywhere, load to RAM first
         if current_tier is None:
             expert.nvme_to_ram()  # Load from disk to RAM first
             current_tier = MemoryTier.RAM
-            self._tier_manager.add_to_tier(MemoryTier.RAM, key)
+            self._add_to_tier(MemoryTier.RAM, key)
 
         # Promote to VRAM if there's space and not already there
         if current_tier != MemoryTier.VRAM and vram_count < self._max_vram_experts:
             if current_tier == MemoryTier.RAM:
-                self._tier_manager.move_between_tiers(
-                    key, MemoryTier.RAM, MemoryTier.VRAM
-                )
+                self._move_between_tiers(key, MemoryTier.RAM, MemoryTier.VRAM)
                 expert.ram_to_vram()  # Promote to VRAM
             elif current_tier == MemoryTier.DISK:
                 # Load directly to VRAM if there's space
-                self._tier_manager.add_to_tier(MemoryTier.VRAM, key)
+                self._add_to_tier(MemoryTier.VRAM, key)
                 expert.nvme_to_vram()  # Load directly to VRAM
 
     def _enforce_capacity_limits(self) -> None:
@@ -241,13 +277,13 @@ class LRUExpertCacheManager(IExpertCacheManager):
         Enforce cache capacity limits with LRU eviction.
         """
         # Get current tier counts
-        vram_count = self._tier_manager.get_tier_size(MemoryTier.VRAM)
-        ram_count = self._tier_manager.get_tier_size(MemoryTier.RAM)
+        vram_count = self._get_tier_size(MemoryTier.VRAM)
+        ram_count = self._get_tier_size(MemoryTier.RAM)
 
         # Evict from VRAM to RAM if over limit
         if vram_count > self._max_vram_experts:
             experts_to_demote = vram_count - self._max_vram_experts
-            vram_experts = self._tier_manager.get_experts_in_tier(MemoryTier.VRAM)
+            vram_experts = self._get_experts_in_tier(MemoryTier.VRAM)
 
             # Find least recently used experts in VRAM
             lru_experts = []
@@ -259,14 +295,12 @@ class LRUExpertCacheManager(IExpertCacheManager):
             for key in lru_experts:
                 expert = self._get_expert(key)
                 expert.vram_to_ram()
-                self._tier_manager.move_between_tiers(
-                    key, MemoryTier.VRAM, MemoryTier.RAM
-                )
+                self._move_between_tiers(key, MemoryTier.VRAM, MemoryTier.RAM)
 
         # Evict from RAM to DISK if over limit
         if ram_count > self._max_ram_experts:
             experts_to_evict = ram_count - self._max_ram_experts
-            ram_experts = self._tier_manager.get_experts_in_tier(MemoryTier.RAM)
+            ram_experts = self._get_experts_in_tier(MemoryTier.RAM)
 
             # Find least recently used experts in RAM
             lru_experts = []
@@ -322,13 +356,11 @@ class LRUExpertCacheManager(IExpertCacheManager):
                         expert.ram_to_vram()
 
                         # Update tier tracking
-                        old_tier = self._tier_manager.get_tier(key)
+                        old_tier = self._get_tier(key)
                         if old_tier:
-                            self._tier_manager.move_between_tiers(
-                                key, old_tier, MemoryTier.VRAM
-                            )
+                            self._move_between_tiers(key, old_tier, MemoryTier.VRAM)
                         else:
-                            self._tier_manager.add_to_tier(MemoryTier.VRAM, key)
+                            self._add_to_tier(MemoryTier.VRAM, key)
 
                     except RuntimeError:
                         # VRAM promotion failed, ensure at least on CPU
@@ -342,13 +374,11 @@ class LRUExpertCacheManager(IExpertCacheManager):
                     expert.vram_to_ram()
 
                     # Update tier tracking
-                    old_tier = self._tier_manager.get_tier(key)
+                    old_tier = self._get_tier(key)
                     if old_tier:
-                        self._tier_manager.move_between_tiers(
-                            key, old_tier, MemoryTier.RAM
-                        )
+                        self._move_between_tiers(key, old_tier, MemoryTier.RAM)
                     else:
-                        self._tier_manager.add_to_tier(MemoryTier.RAM, key)
+                        self._add_to_tier(MemoryTier.RAM, key)
 
     def next(self) -> None:
         pass
