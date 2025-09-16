@@ -36,6 +36,11 @@ build-helper = "scripts.build:main"
 requires = ["maturin>=1.9.4"]
 build-backend = "maturin"
 
+[tool.maturin]
+python-source = "src"
+module-name = "rust_core"
+manifest-path = "libs/core/Cargo.toml"
+
 [tool.setuptools]
 packages = []
 

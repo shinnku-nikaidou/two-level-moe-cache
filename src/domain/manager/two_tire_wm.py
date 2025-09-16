@@ -13,22 +13,25 @@ from .. import ModelType
 
 # Import the Rust implementation
 try:
-    from two_level_moe_cache.core import TwoTireWmExpertCacheManager as RustTwoTireWm
-    from two_level_moe_cache.core import WatermarkConfig, ExpertRef
-    from two_level_moe_cache.core import ExpertKey as RustExpertKey
-    from two_level_moe_cache.core import ExpertParamType as RustExpertParamType
-    from two_level_moe_cache.core import ModelType as RustModelType
+    from rust_core import TwoTireWmExpertCacheManager as RustTwoTireWmExpertCacheManager
+    from rust_core import WatermarkConfig as RustWatermarkConfig
+    from rust_core import ExpertKey as RustExpertKey
+    from rust_core import ExpertRef as RustExpertRef
+    from rust_core import ExpertParamType as RustExpertParamType
+    from rust_core import MemoryTier as RustMemoryTier
+    
     RUST_AVAILABLE = True
-    print("✅ Rust core library loaded successfully")
 except ImportError as e:
     print(f"⚠️  Rust core library not available: {e}")
-    RUST_AVAILABLE = False
-    RustTwoTireWm = None
-    WatermarkConfig = None
-    ExpertRef = None
+    # Mock classes for when Rust is not available
+    RustTwoTireWmExpertCacheManager = None
+    RustWatermarkConfig = None
     RustExpertKey = None
+    RustExpertRef = None
     RustExpertParamType = None
-    RustModelType = None
+    RustMemoryTier = None
+    
+    RUST_AVAILABLE = False
 
 
 class TwoTireWmExpertCacheManager(IExpertCacheManager):

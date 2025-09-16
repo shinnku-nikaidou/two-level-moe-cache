@@ -58,6 +58,7 @@ impl PyCoreCache {
 
 /// A Python module implemented in Rust.
 #[pymodule]
+#[pyo3(name = "rust_core")]
 pub fn core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Legacy functions
     m.add_function(wrap_pyfunction!(add, m)?)?;
@@ -65,14 +66,12 @@ pub fn core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCoreCache>()?;
     
     // New two-tier watermark cache types
+    m.add_class::<python_types::MemoryTier>()?;
     m.add_class::<python_types::ExpertKey>()?;
     m.add_class::<python_types::ExpertRef>()?;
     m.add_class::<python_types::WatermarkConfig>()?;
+    m.add_class::<python_types::ExpertParamType>()?;
     m.add_class::<watermark_cache::TwoTireWmExpertCacheManager>()?;
-    
-    // Add missing enum types - convert to PyClass for proper Python access
-    // For now, expose them as constants or consider creating PyClass wrappers
-    // ExpertParamType values can be accessed through ExpertKey creation
     
     Ok(())
 }

@@ -8,76 +8,140 @@ use pyo3::{Bound, PyAny};
 use serde::{Deserialize, Serialize};
 
 /// Memory tier enumeration matching Python's MemoryTier
+#[pyclass]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum MemoryTier {
+pub struct MemoryTier {
+    value: MemoryTierEnum,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+enum MemoryTierEnum {
     VRAM = 0, // GPU memory - fastest, most limited
     RAM = 1,  // System memory - fast, moderate capacity
     DISK = 2, // NVMe/SSD storage - slower, largest capacity
 }
 
-impl FromPyObject<'_> for MemoryTier {
-    fn extract_bound(ob: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let value: i32 = ob.extract()?;
+#[pymethods]
+impl MemoryTier {
+    #[classattr]
+    pub const VRAM: Self = Self { value: MemoryTierEnum::VRAM };
+    
+    #[classattr]
+    pub const RAM: Self = Self { value: MemoryTierEnum::RAM };
+    
+    #[classattr]
+    pub const DISK: Self = Self { value: MemoryTierEnum::DISK };
+    
+    #[new]
+    fn new(value: i32) -> PyResult<Self> {
         match value {
-            0 => Ok(MemoryTier::VRAM),
-            1 => Ok(MemoryTier::RAM),
-            2 => Ok(MemoryTier::DISK),
+            0 => Ok(Self { value: MemoryTierEnum::VRAM }),
+            1 => Ok(Self { value: MemoryTierEnum::RAM }),
+            2 => Ok(Self { value: MemoryTierEnum::DISK }),
             _ => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
                 "Invalid MemoryTier value: {}",
                 value
             ))),
         }
     }
-}
+    
+    fn __str__(&self) -> &'static str {
+        match self.value {
+            MemoryTierEnum::VRAM => "VRAM",
+            MemoryTierEnum::RAM => "RAM",
+            MemoryTierEnum::DISK => "DISK",
+        }
+    }
+    
+    fn __repr__(&self) -> String {
+        format!("MemoryTier.{}", self.__str__())
+    }
+    
+    fn __eq__(&self, other: &Self) -> bool {
+        self.value == other.value
+    }
+    
+    fn __hash__(&self) -> u64 {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
 
-impl<'py> IntoPyObject<'py> for MemoryTier {
-    type Target = PyAny;
-    type Output = Bound<'py, Self::Target>;
-    type Error = std::convert::Infallible;
-
-    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
-        Ok((self as i32).into_pyobject(py).unwrap().into_any())
+        let mut hasher = DefaultHasher::new();
+        self.value.hash(&mut hasher);
+        hasher.finish()
+    }
+    
+    fn __int__(&self) -> i32 {
+        self.value as i32
     }
 }
 
 /// Expert parameter type matching Python's ExpertParamType
+#[pyclass]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum ExpertParamType {
+pub struct ExpertParamType {
+    value: ExpertParamTypeEnum,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+enum ExpertParamTypeEnum {
     MLP1Weight,
     MLP1Bias,
     MLP2Weight,
     MLP2Bias,
 }
 
-impl FromPyObject<'_> for ExpertParamType {
-    fn extract_bound(ob: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let value: &str = ob.extract()?;
+#[pymethods]
+impl ExpertParamType {
+    #[classattr]
+    pub const MLP1_WEIGHT: Self = Self { value: ExpertParamTypeEnum::MLP1Weight };
+    
+    #[classattr]
+    pub const MLP1_BIAS: Self = Self { value: ExpertParamTypeEnum::MLP1Bias };
+    
+    #[classattr]
+    pub const MLP2_WEIGHT: Self = Self { value: ExpertParamTypeEnum::MLP2Weight };
+    
+    #[classattr]
+    pub const MLP2_BIAS: Self = Self { value: ExpertParamTypeEnum::MLP2Bias };
+    
+    #[new]
+    fn new(value: &str) -> PyResult<Self> {
         match value {
-            "mlp1_weight" => Ok(ExpertParamType::MLP1Weight),
-            "mlp1_bias" => Ok(ExpertParamType::MLP1Bias),
-            "mlp2_weight" => Ok(ExpertParamType::MLP2Weight),
-            "mlp2_bias" => Ok(ExpertParamType::MLP2Bias),
+            "mlp1_weight" => Ok(Self { value: ExpertParamTypeEnum::MLP1Weight }),
+            "mlp1_bias" => Ok(Self { value: ExpertParamTypeEnum::MLP1Bias }),
+            "mlp2_weight" => Ok(Self { value: ExpertParamTypeEnum::MLP2Weight }),
+            "mlp2_bias" => Ok(Self { value: ExpertParamTypeEnum::MLP2Bias }),
             _ => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
                 "Invalid ExpertParamType value: {}",
                 value
             ))),
         }
     }
-}
+    
+    fn __str__(&self) -> &'static str {
+        match self.value {
+            ExpertParamTypeEnum::MLP1Weight => "mlp1_weight",
+            ExpertParamTypeEnum::MLP1Bias => "mlp1_bias",
+            ExpertParamTypeEnum::MLP2Weight => "mlp2_weight",
+            ExpertParamTypeEnum::MLP2Bias => "mlp2_bias",
+        }
+    }
+    
+    fn __repr__(&self) -> String {
+        format!("ExpertParamType('{}')", self.__str__())
+    }
+    
+    fn __eq__(&self, other: &Self) -> bool {
+        self.value == other.value
+    }
+    
+    fn __hash__(&self) -> u64 {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
 
-impl<'py> IntoPyObject<'py> for ExpertParamType {
-    type Target = PyAny;
-    type Output = Bound<'py, Self::Target>;
-    type Error = std::convert::Infallible;
-
-    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
-        let value = match self {
-            ExpertParamType::MLP1Weight => "mlp1_weight",
-            ExpertParamType::MLP1Bias => "mlp1_bias",
-            ExpertParamType::MLP2Weight => "mlp2_weight",
-            ExpertParamType::MLP2Bias => "mlp2_bias",
-        };
-        Ok(value.into_pyobject(py).unwrap().into_any())
+        let mut hasher = DefaultHasher::new();
+        self.value.hash(&mut hasher);
+        hasher.finish()
     }
 }
 
