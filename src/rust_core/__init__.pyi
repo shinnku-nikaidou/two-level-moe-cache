@@ -78,36 +78,22 @@ class TwoTireWmExpertCacheManager:
 
     def __init__(
         self,
-        model_type: str,  # Now accepts string instead of ModelType enum
-        config: WatermarkConfig,
+        model_type: str,  # ModelType string
         total_layers: int,
+        vram_capacity: int,  # Capacity in bytes
+        ram_capacity: int,   # Capacity in bytes
     ) -> None: ...
+    
     def get(self, expert_key: ExpertKey) -> ExpertRef:
         """Get a single expert by key, loading if necessary."""
         ...
 
-    def get_batch(self, expert_keys: List[ExpertKey]) -> List[ExpertRef]:
-        """Get multiple experts efficiently in batch."""
+    def update_activations(self, activated_experts: List[int]) -> None:
+        """Update with new layer activations."""
         ...
 
-    def clear(self) -> None:
-        """Clear all cache state."""
-        ...
-
-    def next(self) -> None:
+    def step_forward(self) -> None:
         """Advance to next time step."""
-        ...
-
-    def update_fused_predictions(self, predictions: Dict[str, float]) -> None:
-        """Update fused predictions from external policy components."""
-        ...
-
-    def get_watermarks(self) -> Tuple[float, float]:
-        """Get current watermark values (vram_watermark, ram_watermark)."""
-        ...
-
-    def get_capacity_usage(self) -> Tuple[Tuple[int, int], Tuple[int, int]]:
-        """Get current capacity usage ((vram_used, vram_capacity), (ram_used, ram_capacity))."""
         ...
 
     def get_stats(self) -> Dict[str, float]:

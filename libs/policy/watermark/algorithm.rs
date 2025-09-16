@@ -289,7 +289,7 @@ mod tests {
     fn test_benefit_density_calculation() {
         let algorithm = WatermarkAlgorithm::for_testing();
         let expert_state = ExpertState {
-            expert_key: ExpertKey::new(0, 0),
+            expert_key: ExpertKey::expert_level(0, 0),
             current_tier: MemoryTier::Disk,
             size_bytes: 1024 * 1024, // 1MB
             last_access_time: 0,
@@ -307,7 +307,7 @@ mod tests {
         let mut algorithm = WatermarkAlgorithm::for_testing();
         
         let mut fused_probs = HashMap::new();
-        let expert_key = ExpertKey::new(0, 0);
+        let expert_key = ExpertKey::expert_level(0, 0);
         fused_probs.insert(expert_key, 0.8);
 
         let decisions = algorithm.make_cache_decisions(&fused_probs).unwrap();

@@ -217,7 +217,7 @@ mod tests {
         let mut ewma_preds = HashMap::new();
         let mut sg_preds = HashMap::new();
         
-        let expert_key = ExpertKey::new(0, 0);
+        let expert_key = ExpertKey::expert_level(0, 0);
         ewma_preds.insert(expert_key, 0.8);
         sg_preds.insert(expert_key, 0.2);
 

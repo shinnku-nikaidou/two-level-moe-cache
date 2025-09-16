@@ -19,8 +19,6 @@ from rust_core import ExpertRef as RustExpertRef
 from rust_core import ExpertParamType as RustExpertParamType
 from rust_core import MemoryTier as RustMemoryTier
 
-RUST_AVAILABLE = True
-
 
 class TwoTireWmExpertCacheManager(IExpertCacheManager):
     """
@@ -42,8 +40,6 @@ class TwoTireWmExpertCacheManager(IExpertCacheManager):
         model_type: ModelType,
         vram_capacity_mb: int = 512,
         ram_capacity_mb: int = 2048,
-        vram_learning_rate: float = 0.01,
-        ram_learning_rate: float = 0.01,
         **kwargs,
     ):
         """
@@ -53,44 +49,31 @@ class TwoTireWmExpertCacheManager(IExpertCacheManager):
             model_type: Type of model for configuration
             vram_capacity_mb: VRAM capacity limit in MB
             ram_capacity_mb: RAM capacity limit in MB
-            vram_learning_rate: Learning rate for VRAM watermark updates
-            ram_learning_rate: Learning rate for RAM watermark updates
             **kwargs: Additional configuration parameters
         """
         super().__init__(model_type)
 
-        # Create watermark configuration
-        config = RustWatermarkConfig(
-            vram_capacity=vram_capacity_mb * 1024 * 1024,  # Convert to bytes
-            ram_capacity=ram_capacity_mb * 1024 * 1024,
-            vram_learning_rate=vram_learning_rate,
-            ram_learning_rate=ram_learning_rate,
-        )
-
-        # Initialize Rust implementation
+        # Initialize Rust implementation (simplified interface)
+        # Note: Using positional args to match Rust #[new] signature:
+        # (model_type, total_layers, vram_capacity, ram_capacity)
         self._rust_cache = RustTwoTireWmExpertCacheManager(
-            model_type=self._rust_model_type(model_type),
-            config=config,
-            total_layers=self._config.num_hidden_layers,
+            self._rust_model_type(model_type),
+            self._config.num_hidden_layers,
+            vram_capacity_mb * 1024 * 1024,
+            ram_capacity_mb * 1024 * 1024,
         )
 
         # Cache for tracking accessed experts
         self._accessed_experts = set()
 
-    def update_fused_predictions(self, predictions: Dict[ExpertKey, float]) -> None:
+    def update_activations(self, activated_experts: List[int]) -> None:
         """
-        Update fused predictions from external policy components.
+        Update layer activations - delegates to simplified core interface.
 
         Args:
-            predictions: Dictionary mapping ExpertKey to activation probability
+            activated_experts: List of expert IDs activated in current layer
         """
-        # Convert ExpertKey to string format expected by Rust
-        rust_predictions = {}
-        for key, prob in predictions.items():
-            key_str = self._expert_key_to_string(key)
-            rust_predictions[key_str] = prob
-
-        self._rust_cache.update_fused_predictions(rust_predictions)
+        self._rust_cache.update_activations(activated_experts)
 
     def get(self, key: ExpertKey) -> Expert:
         """
@@ -120,7 +103,7 @@ class TwoTireWmExpertCacheManager(IExpertCacheManager):
 
     def get_batch(self, keys: List[ExpertKey]) -> List[Expert]:
         """
-        Get batch of experts efficiently.
+        Get batch of experts (implemented using sequential get calls).
 
         Args:
             keys: List of expert identifiers
@@ -131,26 +114,23 @@ class TwoTireWmExpertCacheManager(IExpertCacheManager):
         Raises:
             KeyError: If any expert cannot be loaded
         """
-        rust_keys = [self._python_to_rust_key(key) for key in keys]
-        rust_expert_refs = self._rust_cache.get_batch(rust_keys)
-
+        # Note: Rust implementation doesn't have get_batch, use sequential calls
         experts = []
-        for key, rust_ref in zip(keys, rust_expert_refs):
-            expert = self._get_expert(key)
-            self._sync_expert_from_rust(expert, rust_ref)
+        for key in keys:
+            expert = self.get(key)
             experts.append(expert)
-            self._accessed_experts.add(key)
-
         return experts
 
     def clear(self) -> None:
-        """Clear all cached experts and reset state."""
-        self._rust_cache.clear()
+        """Clear all cached experts and reset state (simplified implementation)."""
+        # Note: Rust implementation doesn't have explicit clear method
+        # Reset our tracking
         self._accessed_experts.clear()
 
     def next(self) -> None:
         """Advance to next time step and apply watermark decisions."""
-        self._rust_cache.next()
+        # Use step_forward which is the actual method in Rust implementation
+        self._rust_cache.step_forward()
 
     def get_watermark_stats(self) -> Dict[str, Any]:
         """
@@ -159,24 +139,13 @@ class TwoTireWmExpertCacheManager(IExpertCacheManager):
         Returns:
             Dictionary with watermark values, capacity usage, and other stats
         """
-        vram_wm, ram_wm = self._rust_cache.get_watermarks()
-        (vram_used, vram_capacity), (ram_used, ram_capacity) = (
-            self._rust_cache.get_capacity_usage()
-        )
+        # Get stats from the Rust implementation
         stats = self._rust_cache.get_stats()
 
-        return {
-            "vram_watermark": vram_wm,
-            "ram_watermark": ram_wm,
-            "vram_usage_bytes": vram_used,
-            "vram_capacity_bytes": vram_capacity,
-            "vram_utilization": vram_used / vram_capacity if vram_capacity > 0 else 0.0,
-            "ram_usage_bytes": ram_used,
-            "ram_capacity_bytes": ram_capacity,
-            "ram_utilization": ram_used / ram_capacity if ram_capacity > 0 else 0.0,
-            "accessed_experts_count": len(self._accessed_experts),
-            **stats,
-        }
+        # Add our Python-side tracking info
+        stats["accessed_experts_count"] = len(self._accessed_experts)
+
+        return stats
 
     # Private helper methods
     def _python_to_rust_key(self, key: ExpertKey) -> RustExpertKey:
@@ -215,20 +184,15 @@ class TwoTireWmExpertCacheManager(IExpertCacheManager):
 
     def _sync_expert_from_rust(self, expert: Expert, rust_ref: RustExpertRef) -> None:
         """Synchronize Python Expert state from Rust reference."""
-        # Update expert's memory tier based on rust reference
-        if rust_ref.tier is not None:
-            from ..cache.entities.types import MemoryTier
+        # For the simplified implementation, we don't actually sync the expert state
+        # since that would require actual tensor loading/moving operations.
+        # The Rust reference contains tier information that's used for caching decisions,
+        # but the Python Expert maintains its own tier based on actual tensor data presence.
 
-            # Convert Rust MemoryTier to Python MemoryTier
-            tier_mapping = {
-                0: MemoryTier.VRAM,  # RustMemoryTier.VRAM
-                1: MemoryTier.RAM,  # RustMemoryTier.RAM
-                2: MemoryTier.DISK,  # RustMemoryTier.DISK
-            }
-            expert.current_tier = tier_mapping.get(rust_ref.tier, MemoryTier.DISK)
+        # In a full implementation, we would:
+        # - Check rust_ref.tier to determine target location
+        # - Load/move tensor data accordingly using expert.load_to_ram(), expert.load_to_vram(), etc.
+        # - Update expert's memory usage tracking
 
-        # Note: In a full implementation, we would also:
-        # - Load actual tensor data if needed
-        # - Update expert's data pointer
-        # - Sync memory usage tracking
-        # For now, we just update the tier information
+        # For now, this is a no-op since we're demonstrating the architecture pattern
+        pass

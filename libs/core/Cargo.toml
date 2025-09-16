@@ -9,6 +9,9 @@ path = "lib.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
+# Policy library for business logic
+policy = { path = "../policy" }
+
 # Python bindings (only for core crate)
 pyo3 = { version = "0.26", features = ["auto-initialize", "extension-module"] }
 

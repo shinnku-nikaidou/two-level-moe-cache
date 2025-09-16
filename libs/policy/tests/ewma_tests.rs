@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use policy::ExpertKey;
+use policy::{ExpertKey, ExpertParamType};
 use policy::ewma::config::EwmaConfig;
 use policy::ewma::error::EwmaError;
 use policy::ewma::predictor::EwmaPredictor;
@@ -54,7 +54,7 @@ fn test_ewma_update_basic() {
     assert!(result.is_ok());
 
     // Check that expert (0,0) has updated probability
-    let expert_key = ExpertKey::new(0, 0);
+    let expert_key = ExpertKey::expert_level(0, 0);
     let probability = predictor.get_probability(expert_key);
 
     // Expected: First encounter should use activation value directly = 1.0
@@ -84,8 +84,8 @@ fn test_ewma_update_multiple_experts() {
     assert!(result.is_ok());
 
     // Check activated experts - first encounter should be 1.0
-    let expert_0 = ExpertKey::new(0, 0);
-    let expert_2 = ExpertKey::new(2, 0);
+    let expert_0 = ExpertKey::expert_level(0, 0);
+    let expert_2 = ExpertKey::expert_level(2, 0);
     let prob_0 = predictor.get_probability(expert_0);
     let prob_2 = predictor.get_probability(expert_2);
 
@@ -94,7 +94,7 @@ fn test_ewma_update_multiple_experts() {
     assert!((prob_2 - 1.0).abs() < 1e-10);
 
     // Check non-activated expert - first encounter with non-activation
-    let expert_1 = ExpertKey::new(1, 0);
+    let expert_1 = ExpertKey::expert_level(1, 0);
     let prob_1 = predictor.get_probability(expert_1);
 
     // First encounter with non-activation: should be 0.0
@@ -195,7 +195,7 @@ fn test_reset_functionality() {
     assert_eq!(predictor.num_tracked_experts(), 0);
 
     // Check that probabilities return to 0.0 for never-encountered experts
-    let expert_key = ExpertKey::new(0, 0);
+    let expert_key = ExpertKey::expert_level(0, 0);
     let probability = predictor.get_probability(expert_key);
     assert_eq!(probability, 0.0);
 }
@@ -203,7 +203,7 @@ fn test_reset_functionality() {
 #[test]
 fn test_expert_key_functionality() {
     // Test ExpertKey creation
-    let key1 = ExpertKey::new(1, 2);
+    let key1 = ExpertKey::expert_level(1, 2);
     assert_eq!(key1.expert_id, 1);
     assert_eq!(key1.layer_id, 2);
 
@@ -211,15 +211,15 @@ fn test_expert_key_functionality() {
     let config = policy::constants::models::PHI_TINY_MOE.clone();
 
     // Valid key
-    let valid_key = ExpertKey::with_validation(0, 0, &config);
+    let valid_key = ExpertKey::with_validation(0, 0, ExpertParamType::MLP1Weight, &config);
     assert!(valid_key.is_ok());
 
     // Invalid layer
-    let invalid_layer = ExpertKey::with_validation(0, 10, &config);
+    let invalid_layer = ExpertKey::with_validation(0, 10, ExpertParamType::MLP1Weight, &config);
     assert!(invalid_layer.is_err());
 
     // Invalid expert
-    let invalid_expert = ExpertKey::with_validation(10, 0, &config);
+    let invalid_expert = ExpertKey::with_validation(10, 0, ExpertParamType::MLP1Weight, &config);
     assert!(invalid_expert.is_err());
 
     // Test layer experts generation
