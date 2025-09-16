@@ -22,13 +22,6 @@ class ExpertParamType(IntEnum):
     MLP2_WEIGHT = 2
     MLP2_BIAS = 3
 
-class ModelType(IntEnum):
-    """Model type enumeration."""
-
-    GPT_OSS_20B = 0
-    GPT_OSS_120B = 1
-    PHI_TINY_MOE = 2
-
 class ExpertKey:
     """Expert identifier combining layer, expert ID, and parameter type."""
 
@@ -85,7 +78,7 @@ class TwoTireWmExpertCacheManager:
 
     def __init__(
         self,
-        model_type: ModelType,
+        model_type: str,  # Now accepts string instead of ModelType enum
         config: WatermarkConfig,
         total_layers: int,
     ) -> None: ...

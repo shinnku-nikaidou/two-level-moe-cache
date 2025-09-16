@@ -18,7 +18,6 @@ from rust_core import ExpertKey as RustExpertKey
 from rust_core import ExpertRef as RustExpertRef
 from rust_core import ExpertParamType as RustExpertParamType
 from rust_core import MemoryTier as RustMemoryTier
-from rust_core import ModelType as RustModelType
 
 RUST_AVAILABLE = True
 
@@ -201,12 +200,12 @@ class TwoTireWmExpertCacheManager(IExpertCacheManager):
         }
         return mapping[param_type]
 
-    def _rust_model_type(self, model_type: ModelType):
-        """Convert Python ModelType to Rust ModelType."""
+    def _rust_model_type(self, model_type: ModelType) -> str:
+        """Convert Python ModelType to Rust-compatible string."""
         mapping = {
-            ModelType.GPT_OSS_20B: RustModelType.GPT_OSS_20B,
-            ModelType.GPT_OSS_120B: RustModelType.GPT_OSS_120B,
-            ModelType.PHI_TINY_MOE: RustModelType.PHI_TINY_MOE,
+            ModelType.GPT_OSS_20B: "gpt-oss-20b",
+            ModelType.GPT_OSS_120B: "gpt-oss-120b",
+            ModelType.PHI_TINY_MOE: "phi-tiny-moe",
         }
         return mapping[model_type]
 
