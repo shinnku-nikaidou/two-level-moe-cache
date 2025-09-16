@@ -116,6 +116,7 @@ Key facts verified through testing:
 - **Test with 2D inputs**: Always test with single token inputs `[1]` -> `[1, hidden_size]` after embedding
 - **Use Checkpoint class**: Let it handle MXFP4 conversion automatically
 - **Reference tests/gptoss_cpu_boil.py**: This demonstrates the correct usage pattern
+- **🚫 No Re-exports**: Never use `pub use module::*;` or similar re-export patterns. Always use fully qualified paths like `module::Type` to maintain clear module boundaries and avoid namespace pollution
 
 ## Indexing Convention
 

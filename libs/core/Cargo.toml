@@ -6,10 +6,7 @@ edition.workspace = true
 [lib]
 name = "core"
 path = "lib.rs"
-
-[features]
-default = ["cuda"]
-cuda = []
+crate-type = ["cdylib"]
 
 [dependencies]
 # Python bindings (only for core crate)

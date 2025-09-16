@@ -11,7 +11,8 @@ from src.domain.cache.interfaces.expert_cache import IExpertCacheManager
 from src.domain.manager import (
     LRUExpertCacheManager,
     DirectNVMEExpertCacheManager, 
-    DirectRAMExpertCacheManager
+    DirectRAMExpertCacheManager,
+    TwoTireWmExpertCacheManager,
 )
 from src.domain import ModelType
 
@@ -29,6 +30,7 @@ class ExpertCacheFactory:
         "lru": LRUExpertCacheManager,
         "direct_vram": DirectNVMEExpertCacheManager,
         "direct_ram": DirectRAMExpertCacheManager,
+        "two_tire_wm": TwoTireWmExpertCacheManager,
     }
 
     @classmethod
@@ -83,21 +85,48 @@ class ExpertCacheFactory:
         model_type: ModelType,
     ) -> IExpertCacheManager:
         """
-        Create a pre-warmed RAM cache for maximum inference performance.
-
-        This creates a cache that loads ALL experts to RAM during initialization,
-        then provides ultra-fast RAM-to-VRAM copying during inference.
-        No disk I/O during get() operations - maximum speed at the cost of
-        high RAM usage and longer initialization time.
+        Create a Direct RAM expert cache.
 
         Args:
-            model_type: Type of model for expert loading
+            model_type: Type of model
 
         Returns:
-            Pre-warmed DirectRAM expert cache
-
-        Note:
-            This will consume significant RAM and take time to initialize,
-            but provides the fastest possible inference performance.
+            Direct RAM cache manager
         """
         return DirectRAMExpertCacheManager(model_type=model_type)
+    
+    @classmethod
+    def create_two_tire_wm_cache_manager(
+        cls,
+        model_type: ModelType,
+        vram_capacity_mb: int = 512,
+        ram_capacity_mb: int = 2048,
+        vram_learning_rate: float = 0.01,
+        ram_learning_rate: float = 0.01,
+        **kwargs
+    ) -> IExpertCacheManager:
+        """
+        Create a Two-Tier Watermark expert cache.
+        
+        Args:
+            model_type: Type of model
+            vram_capacity_mb: VRAM capacity limit in MB
+            ram_capacity_mb: RAM capacity limit in MB  
+            vram_learning_rate: Learning rate for VRAM watermark updates
+            ram_learning_rate: Learning rate for RAM watermark updates
+            **kwargs: Additional configuration parameters
+            
+        Returns:
+            Two-tier watermark cache manager
+            
+        Raises:
+            RuntimeError: If Rust core library is not available
+        """
+        return TwoTireWmExpertCacheManager(
+            model_type=model_type,
+            vram_capacity_mb=vram_capacity_mb,
+            ram_capacity_mb=ram_capacity_mb,
+            vram_learning_rate=vram_learning_rate,
+            ram_learning_rate=ram_learning_rate,
+            **kwargs
+        )
