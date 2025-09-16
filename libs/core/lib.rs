@@ -6,6 +6,7 @@
 use pyo3::prelude::*;
 
 // Module declarations
+pub mod utils;
 pub mod python_types;
 pub mod watermark_cache;
 
