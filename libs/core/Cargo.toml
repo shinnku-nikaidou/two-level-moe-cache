@@ -12,8 +12,8 @@ default = ["cuda"]
 cuda = []
 
 [dependencies]
-# Python bindings
-pyo3 = { workspace = true }
+# Python bindings (only for core crate)
+pyo3 = { version = "0.26", features = ["auto-initialize", "extension-module"] }
 
 # Serialization
 serde = { workspace = true }
