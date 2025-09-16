@@ -6,7 +6,7 @@
 //!
 //! **Current Status: PLACEHOLDER IMPLEMENTATION**
 //! The current implementation is a placeholder that returns 1.0 for any expert key.
-//! 
+//!
 //! The full implementation will include:
 //! - Token embedding and projection layers
 //! - Layer embeddings for different transformer layers  

@@ -21,7 +21,7 @@ use super::error::ScoutGateError;
 /// ScoutGate predictor for semantic-based expert activation probability prediction
 ///
 /// **PLACEHOLDER IMPLEMENTATION**: Currently returns 1.0 for any expert key.
-/// 
+///
 /// The full implementation should include:
 /// - Token embedding and projection layers
 /// - Layer embeddings  
@@ -80,7 +80,7 @@ impl ScoutGatePredictor {
     }
 
     /// Update token context with new token
-    /// 
+    ///
     /// **PLACEHOLDER**: In full implementation, this would:
     /// 1. Add new token to context window
     /// 2. Maintain sliding window of recent m tokens
@@ -91,9 +91,9 @@ impl ScoutGatePredictor {
     }
 
     /// Get activation probability prediction for a specific expert-layer pair
-    /// 
+    ///
     /// **PLACEHOLDER**: Always returns 1.0
-    /// 
+    ///
     /// In the full implementation, this would:
     /// 1. Use recent token context for semantic analysis
     /// 2. Apply token embedding and projection
@@ -106,9 +106,9 @@ impl ScoutGatePredictor {
     }
 
     /// Get activation probability predictions for all experts in a specific layer
-    /// 
+    ///
     /// **PLACEHOLDER**: Returns 1.0 for all experts
-    /// 
+    ///
     /// This is the main interface that should output ŵp^{SG}_{e,ℓ}(t) ∈ [0,1]
     /// for all experts e in layer ℓ at time t.
     pub fn get_layer_probabilities(&self, layer_id: usize) -> HashMap<usize, f64> {
@@ -129,9 +129,9 @@ impl ScoutGatePredictor {
     }
 
     /// Get activation probability predictions for all layers and experts
-    /// 
+    ///
     /// **PLACEHOLDER**: Returns 1.0 for all expert-layer pairs
-    /// 
+    ///
     /// This corresponds to the full ScoutGate output across all layers.
     /// In full implementation, this would be the main prediction method.
     pub fn get_all_probabilities(&self) -> HashMap<ExpertKey, f64> {
@@ -149,9 +149,9 @@ impl ScoutGatePredictor {
     }
 
     /// Force prediction update/refresh
-    /// 
+    ///
     /// **PLACEHOLDER**: No-op in placeholder implementation
-    /// 
+    ///
     /// In full implementation, this would:
     /// 1. Recompute embeddings for current context
     /// 2. Update all layer predictions

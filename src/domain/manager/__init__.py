@@ -17,6 +17,6 @@ from .two_tire_wm import TwoTireWmExpertCacheManager
 __all__ = [
     "LRUExpertCacheManager",
     "DirectNVMEExpertCacheManager",
-    "DirectRAMExpertCacheManager", 
+    "DirectRAMExpertCacheManager",
     "TwoTireWmExpertCacheManager",
 ]

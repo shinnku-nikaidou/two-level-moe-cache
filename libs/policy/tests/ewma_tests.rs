@@ -30,16 +30,12 @@ fn test_invalid_alpha() {
     let config = policy::constants::models::PHI_TINY_MOE.clone();
 
     // Test alpha = 0 (invalid)
-    let ewma_config_zero = EwmaConfig {
-        alpha: 0.0,
-    };
+    let ewma_config_zero = EwmaConfig { alpha: 0.0 };
     let result = EwmaPredictor::new(timer.clone(), config.clone(), ewma_config_zero);
     assert!(matches!(result, Err(EwmaError::InvalidAlpha(_))));
 
     // Test alpha > 1 (invalid)
-    let ewma_config_large = EwmaConfig {
-        alpha: 1.5,
-    };
+    let ewma_config_large = EwmaConfig { alpha: 1.5 };
     let result = EwmaPredictor::new(timer, config, ewma_config_large);
     assert!(matches!(result, Err(EwmaError::InvalidAlpha(_))));
 }
@@ -48,9 +44,7 @@ fn test_invalid_alpha() {
 fn test_ewma_update_basic() {
     let timer = create_test_timer();
     let config = policy::constants::models::PHI_TINY_MOE.clone();
-    let ewma_config = EwmaConfig {
-        alpha: 0.5,
-    };
+    let ewma_config = EwmaConfig { alpha: 0.5 };
 
     let mut predictor = EwmaPredictor::new(timer, config, ewma_config).unwrap();
 
@@ -65,12 +59,12 @@ fn test_ewma_update_basic() {
 
     // Expected: First encounter should use activation value directly = 1.0
     assert!((probability - 1.0).abs() < 1e-10);
-    
+
     // After another non-activation update
     let activated_experts = vec![]; // No experts activated
     let _result = predictor.update_layer_activations(&activated_experts);
     let probability_after = predictor.get_probability(expert_key);
-    
+
     // Expected: (1-0.5)*1.0 + 0.5*0.0 = 0.5
     let expected = (1.0 - 0.5) * 1.0 + 0.5 * 0.0;
     assert!((probability_after - expected).abs() < 1e-10);
@@ -80,9 +74,7 @@ fn test_ewma_update_basic() {
 fn test_ewma_update_multiple_experts() {
     let timer = create_test_timer();
     let config = policy::constants::models::PHI_TINY_MOE.clone();
-    let ewma_config = EwmaConfig {
-        alpha: 0.3,
-    };
+    let ewma_config = EwmaConfig { alpha: 0.3 };
 
     let mut predictor = EwmaPredictor::new(timer, config, ewma_config).unwrap();
 
@@ -107,18 +99,18 @@ fn test_ewma_update_multiple_experts() {
 
     // First encounter with non-activation: should be 0.0
     assert!((prob_1 - 0.0).abs() < 1e-10);
-    
+
     // After second update to test EWMA formula
     let activated_experts = vec![1]; // Only activate expert 1 this time
     let _result = predictor.update_layer_activations(&activated_experts);
-    
+
     // Check updated probabilities using EWMA formula
     let prob_0_after = predictor.get_probability(expert_0);
     let prob_1_after = predictor.get_probability(expert_1);
-    
+
     // Expert 0: was 1.0, now not activated: (1-0.3)*1.0 + 0.3*0.0 = 0.7
     assert!((prob_0_after - 0.7).abs() < 1e-10);
-    
+
     // Expert 1: was 0.0, now activated: (1-0.3)*0.0 + 0.3*1.0 = 0.3
     assert!((prob_1_after - 0.3).abs() < 1e-10);
 }
@@ -154,9 +146,7 @@ fn test_layer_probabilities() {
 fn test_statistical_properties() {
     let timer = create_test_timer();
     let config = policy::constants::models::PHI_TINY_MOE.clone();
-    let ewma_config = EwmaConfig {
-        alpha: 0.2,
-    };
+    let ewma_config = EwmaConfig { alpha: 0.2 };
 
     let predictor = EwmaPredictor::new(timer, config, ewma_config).unwrap();
 
@@ -265,7 +255,7 @@ fn test_ewma_config_methods() {
 
     let invalid_alpha_config = EwmaConfig::new(0.0);
     assert!(invalid_alpha_config.validate().is_err());
-    
+
     let invalid_alpha_config2 = EwmaConfig::new(1.5);
     assert!(invalid_alpha_config2.validate().is_err());
 }

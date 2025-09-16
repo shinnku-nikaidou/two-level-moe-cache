@@ -106,10 +106,7 @@ impl EwmaPredictor {
     /// Get EWMA probability estimate for a specific expert-layer pair
     /// Returns 0.0 for experts that have never been encountered
     pub fn get_probability(&self, expert_key: ExpertKey) -> f64 {
-        self.ewma_values
-            .get(&expert_key)
-            .copied()
-            .unwrap_or(0.0)  // Return 0.0 for never-encountered experts
+        self.ewma_values.get(&expert_key).copied().unwrap_or(0.0) // Return 0.0 for never-encountered experts
     }
 
     /// Get EWMA probability estimates for all experts in a specific layer

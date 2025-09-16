@@ -24,27 +24,39 @@ enum MemoryTierEnum {
 #[pymethods]
 impl MemoryTier {
     #[classattr]
-    pub const VRAM: Self = Self { value: MemoryTierEnum::VRAM };
-    
+    pub const VRAM: Self = Self {
+        value: MemoryTierEnum::VRAM,
+    };
+
     #[classattr]
-    pub const RAM: Self = Self { value: MemoryTierEnum::RAM };
-    
+    pub const RAM: Self = Self {
+        value: MemoryTierEnum::RAM,
+    };
+
     #[classattr]
-    pub const DISK: Self = Self { value: MemoryTierEnum::DISK };
-    
+    pub const DISK: Self = Self {
+        value: MemoryTierEnum::DISK,
+    };
+
     #[new]
     fn new(value: i32) -> PyResult<Self> {
         match value {
-            0 => Ok(Self { value: MemoryTierEnum::VRAM }),
-            1 => Ok(Self { value: MemoryTierEnum::RAM }),
-            2 => Ok(Self { value: MemoryTierEnum::DISK }),
+            0 => Ok(Self {
+                value: MemoryTierEnum::VRAM,
+            }),
+            1 => Ok(Self {
+                value: MemoryTierEnum::RAM,
+            }),
+            2 => Ok(Self {
+                value: MemoryTierEnum::DISK,
+            }),
             _ => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
                 "Invalid MemoryTier value: {}",
                 value
             ))),
         }
     }
-    
+
     fn __str__(&self) -> &'static str {
         match self.value {
             MemoryTierEnum::VRAM => "VRAM",
@@ -52,15 +64,15 @@ impl MemoryTier {
             MemoryTierEnum::DISK => "DISK",
         }
     }
-    
+
     fn __repr__(&self) -> String {
         format!("MemoryTier.{}", self.__str__())
     }
-    
+
     fn __eq__(&self, other: &Self) -> bool {
         self.value == other.value
     }
-    
+
     fn __hash__(&self) -> u64 {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
@@ -69,7 +81,7 @@ impl MemoryTier {
         self.value.hash(&mut hasher);
         hasher.finish()
     }
-    
+
     fn __int__(&self) -> i32 {
         self.value as i32
     }
@@ -93,31 +105,47 @@ enum ExpertParamTypeEnum {
 #[pymethods]
 impl ExpertParamType {
     #[classattr]
-    pub const MLP1_WEIGHT: Self = Self { value: ExpertParamTypeEnum::MLP1Weight };
-    
+    pub const MLP1_WEIGHT: Self = Self {
+        value: ExpertParamTypeEnum::MLP1Weight,
+    };
+
     #[classattr]
-    pub const MLP1_BIAS: Self = Self { value: ExpertParamTypeEnum::MLP1Bias };
-    
+    pub const MLP1_BIAS: Self = Self {
+        value: ExpertParamTypeEnum::MLP1Bias,
+    };
+
     #[classattr]
-    pub const MLP2_WEIGHT: Self = Self { value: ExpertParamTypeEnum::MLP2Weight };
-    
+    pub const MLP2_WEIGHT: Self = Self {
+        value: ExpertParamTypeEnum::MLP2Weight,
+    };
+
     #[classattr]
-    pub const MLP2_BIAS: Self = Self { value: ExpertParamTypeEnum::MLP2Bias };
-    
+    pub const MLP2_BIAS: Self = Self {
+        value: ExpertParamTypeEnum::MLP2Bias,
+    };
+
     #[new]
     fn new(value: &str) -> PyResult<Self> {
         match value {
-            "mlp1_weight" => Ok(Self { value: ExpertParamTypeEnum::MLP1Weight }),
-            "mlp1_bias" => Ok(Self { value: ExpertParamTypeEnum::MLP1Bias }),
-            "mlp2_weight" => Ok(Self { value: ExpertParamTypeEnum::MLP2Weight }),
-            "mlp2_bias" => Ok(Self { value: ExpertParamTypeEnum::MLP2Bias }),
+            "mlp1_weight" => Ok(Self {
+                value: ExpertParamTypeEnum::MLP1Weight,
+            }),
+            "mlp1_bias" => Ok(Self {
+                value: ExpertParamTypeEnum::MLP1Bias,
+            }),
+            "mlp2_weight" => Ok(Self {
+                value: ExpertParamTypeEnum::MLP2Weight,
+            }),
+            "mlp2_bias" => Ok(Self {
+                value: ExpertParamTypeEnum::MLP2Bias,
+            }),
             _ => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
                 "Invalid ExpertParamType value: {}",
                 value
             ))),
         }
     }
-    
+
     fn __str__(&self) -> &'static str {
         match self.value {
             ExpertParamTypeEnum::MLP1Weight => "mlp1_weight",
@@ -126,15 +154,15 @@ impl ExpertParamType {
             ExpertParamTypeEnum::MLP2Bias => "mlp2_bias",
         }
     }
-    
+
     fn __repr__(&self) -> String {
         format!("ExpertParamType('{}')", self.__str__())
     }
-    
+
     fn __eq__(&self, other: &Self) -> bool {
         self.value == other.value
     }
-    
+
     fn __hash__(&self) -> u64 {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};

@@ -10,7 +10,7 @@ import sys
 import os
 
 # Add src to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
 def test_rust_imports():
@@ -29,14 +29,10 @@ def test_python_wrapper():
     print("\n=== Testing Python Wrapper ===")
 
     # Test that we can create the wrapper directly
-    try:
-        from domain.manager.two_tire_wm import TwoTireWmExpertCacheManager
+    from src.domain.manager.two_tire_wm import TwoTireWmExpertCacheManager
 
-        print("✅ Python wrapper imported successfully")
-        return True
-    except ImportError as e:
-        print(f"❌ Failed to import Python wrapper: {e}")
-        return False
+    print("✅ Python wrapper imported successfully")
+    return True
 
 
 def test_factory():
@@ -44,14 +40,10 @@ def test_factory():
     print("\n=== Testing Factory ===")
 
     # Simplified test - just check if we can import
-    try:
-        from services.cache.expert_cache_factory import ExpertCacheFactory
+    from src.services.cache.expert_cache_factory import ExpertCacheFactory
 
-        print("✅ Factory imported successfully")
-        return True
-    except ImportError as e:
-        print(f"❌ Failed to import factory: {e}")
-        return False
+    print("✅ Factory imported successfully")
+    return True
 
 
 def main():

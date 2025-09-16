@@ -10,7 +10,7 @@ from src.config.cache_config import CacheConfig
 from src.domain.cache.interfaces.expert_cache import IExpertCacheManager
 from src.domain.manager import (
     LRUExpertCacheManager,
-    DirectNVMEExpertCacheManager, 
+    DirectNVMEExpertCacheManager,
     DirectRAMExpertCacheManager,
     TwoTireWmExpertCacheManager,
 )
@@ -94,7 +94,7 @@ class ExpertCacheFactory:
             Direct RAM cache manager
         """
         return DirectRAMExpertCacheManager(model_type=model_type)
-    
+
     @classmethod
     def create_two_tire_wm_cache_manager(
         cls,
@@ -103,22 +103,22 @@ class ExpertCacheFactory:
         ram_capacity_mb: int = 2048,
         vram_learning_rate: float = 0.01,
         ram_learning_rate: float = 0.01,
-        **kwargs
+        **kwargs,
     ) -> IExpertCacheManager:
         """
         Create a Two-Tier Watermark expert cache.
-        
+
         Args:
             model_type: Type of model
             vram_capacity_mb: VRAM capacity limit in MB
-            ram_capacity_mb: RAM capacity limit in MB  
+            ram_capacity_mb: RAM capacity limit in MB
             vram_learning_rate: Learning rate for VRAM watermark updates
             ram_learning_rate: Learning rate for RAM watermark updates
             **kwargs: Additional configuration parameters
-            
+
         Returns:
             Two-tier watermark cache manager
-            
+
         Raises:
             RuntimeError: If Rust core library is not available
         """
@@ -128,5 +128,5 @@ class ExpertCacheFactory:
             ram_capacity_mb=ram_capacity_mb,
             vram_learning_rate=vram_learning_rate,
             ram_learning_rate=ram_learning_rate,
-            **kwargs
+            **kwargs,
         )

@@ -1,5 +1,5 @@
 //! Core library module for two-level MoE cache
-//! 
+//!
 //! This library provides high-performance Rust implementations of caching algorithms
 //! for Mixture-of-Experts models, with Python bindings via PyO3.
 
@@ -64,7 +64,7 @@ pub fn core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(add, m)?)?;
     m.add_function(wrap_pyfunction!(get_version, m)?)?;
     m.add_class::<PyCoreCache>()?;
-    
+
     // New two-tier watermark cache types
     m.add_class::<python_types::MemoryTier>()?;
     m.add_class::<python_types::ExpertKey>()?;
@@ -72,6 +72,6 @@ pub fn core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<python_types::WatermarkConfig>()?;
     m.add_class::<python_types::ExpertParamType>()?;
     m.add_class::<watermark_cache::TwoTireWmExpertCacheManager>()?;
-    
+
     Ok(())
 }

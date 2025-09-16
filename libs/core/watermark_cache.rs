@@ -400,7 +400,11 @@ impl TwoTireWmExpertCacheManager {
     }
 
     fn _compute_benefit_densities(&self, expert_key: &ExpertKey) -> (f64, f64) {
-        let fused_prob = self.fused_predictions.get(expert_key).copied().unwrap_or(0.0);
+        let fused_prob = self
+            .fused_predictions
+            .get(expert_key)
+            .copied()
+            .unwrap_or(0.0);
         let state = self.expert_states.get(expert_key).unwrap();
 
         // b^G = p^fuse * C^G / S
