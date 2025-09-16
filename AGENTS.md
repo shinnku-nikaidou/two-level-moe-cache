@@ -116,3 +116,34 @@ Key facts verified through testing:
 - **Test with 2D inputs**: Always test with single token inputs `[1]` -> `[1, hidden_size]` after embedding
 - **Use Checkpoint class**: Let it handle MXFP4 conversion automatically
 - **Reference tests/gptoss_cpu_boil.py**: This demonstrates the correct usage pattern
+
+## Indexing Convention
+
+### ⚠️ Critical: Documentation vs Implementation Index Differences
+
+**The documentation (docs/Two Level Caching MOE large language model.md) uses 1-based indexing throughout, but our implementation uses 0-based indexing for consistency with standard programming conventions.**
+
+#### Documentation (1-based)
+
+- Layers: `ℓ ∈ {1, 2, ..., L}`
+- Experts: `e ∈ {1, 2, ..., E_ℓ}`
+- Time steps: `t = 1, 2, 3, ...`
+- Layer-local clock: `k = 1, 2, 3, ...`
+- Current layer formula: `ℓ(t) = ((t-1) mod L) + 1`
+- Layer-local time: `k = ⌊(t-ℓ)/L⌋ + 1`
+
+#### Implementation (0-based)
+
+- Layers: `layer_id ∈ {0, 1, ..., L-1}`
+- Experts: `expert_id ∈ {0, 1, ..., E_layer-1}`
+- Time steps: `t = 0, 1, 2, ...`
+- Layer-local clock: `k = 0, 1, 2, ...`
+- Current layer formula: `layer_id = t mod L`
+- Visit count: `v_ℓ(t) = ⌊t/L⌋ + (1 if t%L >= ℓ else 0)`
+
+#### Index Conversion Guidelines
+
+- **When reading documentation**: Subtract 1 from layer/expert indices and time values
+- **When implementing**: Use 0-based indexing throughout the codebase
+- **When debugging**: Be aware of this offset when comparing with documentation formulas
+- **Timer module**: Already implements 0-based indexing correctly with equivalent mathematics
