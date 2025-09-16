@@ -26,9 +26,6 @@ pub struct EwmaPredictor {
     /// Sparse storage for EWMA values: ExpertKey -> probability
     /// Only stores experts that have been activated at least once
     ewma_values: HashMap<ExpertKey, f64>,
-
-    /// Initialization value p₀ for new expert-layer pairs
-    initialization_value: f64,
 }
 
 impl EwmaPredictor {
@@ -46,7 +43,6 @@ impl EwmaPredictor {
             alpha: ewma_config.alpha,
             config,
             ewma_values: HashMap::new(),
-            initialization_value: ewma_config.initialization_value,
         })
     }
 
@@ -90,15 +86,15 @@ impl EwmaPredictor {
             let is_activated = activated_experts.contains(&expert_key.expert_id);
             let hit_indicator = if is_activated { 1.0 } else { 0.0 };
 
-            // Get current EWMA value or initialize with p₀
-            let current_ewma = self
-                .ewma_values
-                .get(&expert_key)
-                .copied()
-                .unwrap_or(self.initialization_value);
-
-            // Apply EWMA update formula
-            let new_ewma = (1.0 - self.alpha) * current_ewma + self.alpha * hit_indicator;
+            // Apply EWMA update: for first encounter, use the activation value directly
+            // For subsequent updates, use the EWMA formula
+            let new_ewma = if let Some(current_ewma) = self.ewma_values.get(&expert_key) {
+                // Subsequent update: p̂_{e,ℓ}^{EWMA}(t) = (1-α)p̂_{e,ℓ}^{EWMA}(t⁻) + α·p̂_{e,ℓ}^{HIT}(t)
+                (1.0 - self.alpha) * current_ewma + self.alpha * hit_indicator
+            } else {
+                // First encounter: use activation value directly (0 or 1)
+                hit_indicator
+            };
 
             // Store updated value
             self.ewma_values.insert(expert_key, new_ewma);
@@ -108,11 +104,12 @@ impl EwmaPredictor {
     }
 
     /// Get EWMA probability estimate for a specific expert-layer pair
+    /// Returns 0.0 for experts that have never been encountered
     pub fn get_probability(&self, expert_key: ExpertKey) -> f64 {
         self.ewma_values
             .get(&expert_key)
             .copied()
-            .unwrap_or(self.initialization_value)
+            .unwrap_or(0.0)  // Return 0.0 for never-encountered experts
     }
 
     /// Get EWMA probability estimates for all experts in a specific layer
@@ -149,11 +146,6 @@ impl EwmaPredictor {
     /// Get current alpha parameter
     pub fn alpha(&self) -> f64 {
         self.alpha
-    }
-
-    /// Get initialization value
-    pub fn initialization_value(&self) -> f64 {
-        self.initialization_value
     }
 
     /// Get model configuration

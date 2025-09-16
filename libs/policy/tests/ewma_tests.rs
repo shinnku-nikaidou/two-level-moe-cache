@@ -32,7 +32,6 @@ fn test_invalid_alpha() {
     // Test alpha = 0 (invalid)
     let ewma_config_zero = EwmaConfig {
         alpha: 0.0,
-        ..EwmaConfig::default()
     };
     let result = EwmaPredictor::new(timer.clone(), config.clone(), ewma_config_zero);
     assert!(matches!(result, Err(EwmaError::InvalidAlpha(_))));
@@ -40,32 +39,9 @@ fn test_invalid_alpha() {
     // Test alpha > 1 (invalid)
     let ewma_config_large = EwmaConfig {
         alpha: 1.5,
-        ..EwmaConfig::default()
     };
     let result = EwmaPredictor::new(timer, config, ewma_config_large);
     assert!(matches!(result, Err(EwmaError::InvalidAlpha(_))));
-}
-
-#[test]
-fn test_invalid_init_value() {
-    let timer = create_test_timer();
-    let config = policy::constants::models::PHI_TINY_MOE.clone();
-
-    // Test negative initialization value (invalid)
-    let ewma_config_negative = EwmaConfig {
-        initialization_value: -0.1,
-        ..EwmaConfig::default()
-    };
-    let result = EwmaPredictor::new(timer.clone(), config.clone(), ewma_config_negative);
-    assert!(matches!(result, Err(EwmaError::InvalidInitValue(_))));
-
-    // Test initialization value > 1 (invalid)
-    let ewma_config_large = EwmaConfig {
-        initialization_value: 1.5,
-        ..EwmaConfig::default()
-    };
-    let result = EwmaPredictor::new(timer, config, ewma_config_large);
-    assert!(matches!(result, Err(EwmaError::InvalidInitValue(_))));
 }
 
 #[test]
@@ -74,7 +50,6 @@ fn test_ewma_update_basic() {
     let config = policy::constants::models::PHI_TINY_MOE.clone();
     let ewma_config = EwmaConfig {
         alpha: 0.5,
-        initialization_value: 0.1,
     };
 
     let mut predictor = EwmaPredictor::new(timer, config, ewma_config).unwrap();
@@ -88,9 +63,17 @@ fn test_ewma_update_basic() {
     let expert_key = ExpertKey::new(0, 0);
     let probability = predictor.get_probability(expert_key);
 
-    // Expected: (1-0.5)*0.1 + 0.5*1.0 = 0.05 + 0.5 = 0.55
-    let expected = (1.0 - 0.5) * 0.1 + 0.5 * 1.0;
-    assert!((probability - expected).abs() < 1e-10);
+    // Expected: First encounter should use activation value directly = 1.0
+    assert!((probability - 1.0).abs() < 1e-10);
+    
+    // After another non-activation update
+    let activated_experts = vec![]; // No experts activated
+    let _result = predictor.update_layer_activations(&activated_experts);
+    let probability_after = predictor.get_probability(expert_key);
+    
+    // Expected: (1-0.5)*1.0 + 0.5*0.0 = 0.5
+    let expected = (1.0 - 0.5) * 1.0 + 0.5 * 0.0;
+    assert!((probability_after - expected).abs() < 1e-10);
 }
 
 #[test]
@@ -99,7 +82,6 @@ fn test_ewma_update_multiple_experts() {
     let config = policy::constants::models::PHI_TINY_MOE.clone();
     let ewma_config = EwmaConfig {
         alpha: 0.3,
-        initialization_value: 0.2,
     };
 
     let mut predictor = EwmaPredictor::new(timer, config, ewma_config).unwrap();
@@ -109,24 +91,36 @@ fn test_ewma_update_multiple_experts() {
     let result = predictor.update_layer_activations(&activated_experts);
     assert!(result.is_ok());
 
-    // Check activated experts
+    // Check activated experts - first encounter should be 1.0
     let expert_0 = ExpertKey::new(0, 0);
     let expert_2 = ExpertKey::new(2, 0);
     let prob_0 = predictor.get_probability(expert_0);
     let prob_2 = predictor.get_probability(expert_2);
 
-    // Expected for activated: (1-0.3)*0.2 + 0.3*1.0 = 0.14 + 0.3 = 0.44
-    let expected_activated = (1.0 - 0.3) * 0.2 + 0.3 * 1.0;
-    assert!((prob_0 - expected_activated).abs() < 1e-10);
-    assert!((prob_2 - expected_activated).abs() < 1e-10);
+    // First encounter with activation: should be 1.0
+    assert!((prob_0 - 1.0).abs() < 1e-10);
+    assert!((prob_2 - 1.0).abs() < 1e-10);
 
-    // Check non-activated expert
+    // Check non-activated expert - first encounter with non-activation
     let expert_1 = ExpertKey::new(1, 0);
     let prob_1 = predictor.get_probability(expert_1);
 
-    // Expected for non-activated: (1-0.3)*0.2 + 0.3*0.0 = 0.14
-    let expected_non_activated = (1.0 - 0.3) * 0.2;
-    assert!((prob_1 - expected_non_activated).abs() < 1e-10);
+    // First encounter with non-activation: should be 0.0
+    assert!((prob_1 - 0.0).abs() < 1e-10);
+    
+    // After second update to test EWMA formula
+    let activated_experts = vec![1]; // Only activate expert 1 this time
+    let _result = predictor.update_layer_activations(&activated_experts);
+    
+    // Check updated probabilities using EWMA formula
+    let prob_0_after = predictor.get_probability(expert_0);
+    let prob_1_after = predictor.get_probability(expert_1);
+    
+    // Expert 0: was 1.0, now not activated: (1-0.3)*1.0 + 0.3*0.0 = 0.7
+    assert!((prob_0_after - 0.7).abs() < 1e-10);
+    
+    // Expert 1: was 0.0, now activated: (1-0.3)*0.0 + 0.3*1.0 = 0.3
+    assert!((prob_1_after - 0.3).abs() < 1e-10);
 }
 
 #[test]
@@ -162,7 +156,6 @@ fn test_statistical_properties() {
     let config = policy::constants::models::PHI_TINY_MOE.clone();
     let ewma_config = EwmaConfig {
         alpha: 0.2,
-        initialization_value: 0.1,
     };
 
     let predictor = EwmaPredictor::new(timer, config, ewma_config).unwrap();
@@ -211,10 +204,10 @@ fn test_reset_functionality() {
     predictor.reset();
     assert_eq!(predictor.num_tracked_experts(), 0);
 
-    // Check that probabilities return to initialization value
+    // Check that probabilities return to 0.0 for never-encountered experts
     let expert_key = ExpertKey::new(0, 0);
     let probability = predictor.get_probability(expert_key);
-    assert_eq!(probability, predictor.initialization_value());
+    assert_eq!(probability, 0.0);
 }
 
 #[test]
@@ -258,28 +251,21 @@ fn test_ewma_config_methods() {
     // Test default config
     let default_config = EwmaConfig::default();
     assert_eq!(default_config.alpha, policy::constants::ALPHA);
-    assert_eq!(default_config.initialization_value, 0.1);
 
     // Test custom constructors
     let alpha_config = EwmaConfig::with_alpha(0.5);
     assert_eq!(alpha_config.alpha, 0.5);
-    assert_eq!(alpha_config.initialization_value, 0.1);
 
-    let init_config = EwmaConfig::with_init_value(0.2);
-    assert_eq!(init_config.alpha, policy::constants::ALPHA);
-    assert_eq!(init_config.initialization_value, 0.2);
-
-    let custom_config = EwmaConfig::new(0.4, 0.3);
+    let custom_config = EwmaConfig::new(0.4);
     assert_eq!(custom_config.alpha, 0.4);
-    assert_eq!(custom_config.initialization_value, 0.3);
 
     // Test validation
-    let valid_config = EwmaConfig::new(0.5, 0.5);
+    let valid_config = EwmaConfig::new(0.5);
     assert!(valid_config.validate().is_ok());
 
-    let invalid_alpha_config = EwmaConfig::new(0.0, 0.5);
+    let invalid_alpha_config = EwmaConfig::new(0.0);
     assert!(invalid_alpha_config.validate().is_err());
-
-    let invalid_init_config = EwmaConfig::new(0.5, -0.1);
-    assert!(invalid_init_config.validate().is_err());
+    
+    let invalid_alpha_config2 = EwmaConfig::new(1.5);
+    assert!(invalid_alpha_config2.validate().is_err());
 }

@@ -5,7 +5,6 @@ use crate::timer::TimerError;
 #[derive(Debug, Clone, PartialEq)]
 pub enum EwmaError {
     InvalidAlpha(f64),
-    InvalidInitValue(f64),
     TimerError(TimerError),
     ExpertNotFound(ExpertKey),
 }
@@ -15,9 +14,6 @@ impl std::fmt::Display for EwmaError {
         match self {
             EwmaError::InvalidAlpha(alpha) => {
                 write!(f, "Invalid alpha {} (must be in (0,1])", alpha)
-            }
-            EwmaError::InvalidInitValue(val) => {
-                write!(f, "Invalid initialization value {} (must be in [0,1])", val)
             }
             EwmaError::TimerError(e) => write!(f, "Timer error: {}", e),
             EwmaError::ExpertNotFound(key) => {
