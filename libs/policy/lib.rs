@@ -2,4 +2,5 @@
 mod constants;
 mod ewma;
 mod scoutgate;
+mod timer;
 mod watermark;
