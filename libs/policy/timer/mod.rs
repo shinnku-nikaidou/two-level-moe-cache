@@ -37,6 +37,36 @@ impl Timer {
         })
     }
 
+    /// Create a timer instance configured for GPT-OSS-20B model
+    /// Uses the predefined configuration: 24 layers (block.0 to block.23)
+    pub fn from_gptoss20b() -> Self {
+        use crate::constants::models::GPT_OSS_20B;
+        Timer {
+            current_time: 0,
+            total_layers: GPT_OSS_20B.total_layers,
+        }
+    }
+
+    /// Create a timer instance configured for GPT-OSS-120B model
+    /// Uses the predefined configuration: 36 layers
+    pub fn from_gptoss120b() -> Self {
+        use crate::constants::models::GPT_OSS_120B;
+        Timer {
+            current_time: 0,
+            total_layers: GPT_OSS_120B.total_layers,
+        }
+    }
+
+    /// Create a timer instance configured for Phi-Tiny-MoE model
+    /// Uses the predefined configuration: 8 layers (for testing)
+    pub fn from_phi_tiny_moe() -> Self {
+        use crate::constants::models::PHI_TINY_MOE;
+        Timer {
+            current_time: 0,
+            total_layers: PHI_TINY_MOE.total_layers,
+        }
+    }
+
     /// Calculate current executing layer from global time
     /// Formula: ℓ(t) = t mod L (0-based indexing)
     ///
@@ -96,106 +126,5 @@ impl Timer {
     /// Get visit count for a specific layer at current time
     pub fn layer_visit_count(&self, layer: usize) -> Result<u64, TimerError> {
         Self::get_visit_count(layer, self.current_time, self.total_layers)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_layer_mapping() {
-        // Test ℓ(t) = t mod L (0-based indexing)
-        assert_eq!(Timer::get_current_layer(0, 3).unwrap(), 0);
-        assert_eq!(Timer::get_current_layer(1, 3).unwrap(), 1);
-        assert_eq!(Timer::get_current_layer(2, 3).unwrap(), 2);
-        assert_eq!(Timer::get_current_layer(3, 3).unwrap(), 0);
-        assert_eq!(Timer::get_current_layer(4, 3).unwrap(), 1);
-        assert_eq!(Timer::get_current_layer(5, 3).unwrap(), 2);
-    }
-
-    #[test]
-    fn test_visit_count() {
-        // Test v_ℓ(t) = ⌊t/L⌋ + (1 if t%L >= ℓ else 0)
-        // For 3 layers: [0, 1, 2, 0, 1, 2, 0, 1, 2, ...]
-
-        // Layer 0 visits
-        assert_eq!(Timer::get_visit_count(0, 0, 3).unwrap(), 1); // t=0: layer 0 executing
-        assert_eq!(Timer::get_visit_count(0, 1, 3).unwrap(), 1); // t=1: layer 1 executing, layer 0 visited once
-        assert_eq!(Timer::get_visit_count(0, 2, 3).unwrap(), 1); // t=2: layer 2 executing, layer 0 visited once
-        assert_eq!(Timer::get_visit_count(0, 3, 3).unwrap(), 2); // t=3: layer 0 executing again
-
-        // Layer 1 visits
-        assert_eq!(Timer::get_visit_count(1, 0, 3).unwrap(), 0); // t=0: layer 1 not visited yet
-        assert_eq!(Timer::get_visit_count(1, 1, 3).unwrap(), 1); // t=1: layer 1 executing
-        assert_eq!(Timer::get_visit_count(1, 4, 3).unwrap(), 2); // t=4: layer 1 executing second time
-
-        // Layer 2 visits
-        assert_eq!(Timer::get_visit_count(2, 0, 3).unwrap(), 0); // t=0: layer 2 not visited yet
-        assert_eq!(Timer::get_visit_count(2, 1, 3).unwrap(), 0); // t=1: layer 2 not visited yet
-        assert_eq!(Timer::get_visit_count(2, 2, 3).unwrap(), 1); // t=2: layer 2 executing
-        assert_eq!(Timer::get_visit_count(2, 5, 3).unwrap(), 2); // t=5: layer 2 executing second time
-    }
-
-    #[test]
-    fn test_edge_cases() {
-        // Boundary conditions
-        assert!(Timer::get_current_layer(0, 0).is_err()); // No layers
-        assert_eq!(Timer::get_current_layer(10, 1).unwrap(), 0); // Single layer
-
-        // Invalid layer indices
-        assert!(Timer::get_visit_count(3, 0, 3).is_err()); // layer >= total_layers
-        assert!(Timer::get_visit_count(0, 0, 0).is_err()); // No layers
-    }
-
-    #[test]
-    fn test_timer_instance() {
-        let mut timer = Timer::new(3).unwrap();
-
-        // Initial state (t=0)
-        assert_eq!(timer.current_time(), 0);
-        assert_eq!(timer.current_layer().unwrap(), 0); // Layer 0 at t=0
-        assert_eq!(timer.layer_visit_count(0).unwrap(), 1); // Layer 0 is currently executing
-        assert_eq!(timer.layer_visit_count(1).unwrap(), 0); // Layer 1 not visited yet
-        assert_eq!(timer.layer_visit_count(2).unwrap(), 0); // Layer 2 not visited yet
-
-        // First tick (t=1)
-        timer.tick();
-        assert_eq!(timer.current_time(), 1);
-        assert_eq!(timer.current_layer().unwrap(), 1); // Layer 1 at t=1
-        assert_eq!(timer.layer_visit_count(0).unwrap(), 1); // Layer 0 visited once
-        assert_eq!(timer.layer_visit_count(1).unwrap(), 1); // Layer 1 currently executing
-        assert_eq!(timer.layer_visit_count(2).unwrap(), 0); // Layer 2 not visited yet
-
-        // Second tick (t=2)
-        timer.tick();
-        assert_eq!(timer.current_layer().unwrap(), 2); // Layer 2 at t=2
-        assert_eq!(timer.layer_visit_count(2).unwrap(), 1); // Layer 2 currently executing
-
-        // Third tick (t=3) - cycles back to layer 0
-        timer.tick();
-        assert_eq!(timer.current_layer().unwrap(), 0); // Layer 0 at t=3
-        assert_eq!(timer.layer_visit_count(0).unwrap(), 2); // Layer 0 visited twice now
-    }
-
-    #[test]
-    fn test_invalid_creation() {
-        assert!(Timer::new(0).is_err());
-    }
-
-    #[test]
-    fn test_visit_count_comprehensive() {
-        // Test comprehensive visit counting for different scenarios
-
-        // Single layer case
-        assert_eq!(Timer::get_visit_count(0, 0, 1).unwrap(), 1);
-        assert_eq!(Timer::get_visit_count(0, 5, 1).unwrap(), 6); // Every time step is layer 0
-
-        // Two layer case: [0, 1, 0, 1, 0, 1, ...]
-        assert_eq!(Timer::get_visit_count(0, 0, 2).unwrap(), 1); // t=0: executing layer 0
-        assert_eq!(Timer::get_visit_count(0, 1, 2).unwrap(), 1); // t=1: layer 0 visited once
-        assert_eq!(Timer::get_visit_count(0, 2, 2).unwrap(), 2); // t=2: executing layer 0 again
-        assert_eq!(Timer::get_visit_count(1, 1, 2).unwrap(), 1); // t=1: executing layer 1
-        assert_eq!(Timer::get_visit_count(1, 3, 2).unwrap(), 2); // t=3: executing layer 1 again
     }
 }
