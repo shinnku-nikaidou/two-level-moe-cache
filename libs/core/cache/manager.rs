@@ -32,15 +32,6 @@ pub struct RustTwoTireWmExpertCacheManager {
 }
 
 impl RustTwoTireWmExpertCacheManager {
-    /// Convert ModelType to ModelConfig
-    fn model_type_to_config(model_type: &RustModelType) -> Result<&'static ModelConfig, String> {
-        match model_type {
-            RustModelType::GptOss20B => Ok(&policy::constants::models::GPT_OSS_20B),
-            RustModelType::GptOss120B => Ok(&policy::constants::models::GPT_OSS_120B),
-            RustModelType::PhiTinyMoe => Ok(&policy::constants::models::PHI_TINY_MOE),
-        }
-    }
-
     /// Create a new cache manager instance
     ///
     /// This function automatically derives all expert keys from the provided model type
@@ -71,18 +62,17 @@ impl RustTwoTireWmExpertCacheManager {
         vram_capacity: usize,
         ram_capacity: usize,
     ) -> Result<Self, String> {
-        // Get model configuration from model_type
-        let config = Self::model_type_to_config(&model_type)?;
+        // Get model configuration from model_type using From trait
+        let config = model_type.into();
 
         // Generate all expert keys for this model
-        let all_experts_key = ExpertKey::all_experts(config);
+        let all_experts_key = ExpertKey::all_experts(&config);
 
         // Validate the generated expert keys count
         let expected_count = config.total_layers * config.experts_per_layer * 4; // 4 param types per expert
         if all_experts_key.len() != expected_count {
             return Err(format!(
-                "Expert key count mismatch for model type {:?}: expected {}, got {}",
-                model_type,
+                "Expert key count mismatch for model type : expected {}, got {}",
                 expected_count,
                 all_experts_key.len()
             ));

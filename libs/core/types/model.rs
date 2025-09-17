@@ -3,6 +3,7 @@
 //! This module defines the ModelType enumeration and its Python conversions
 //! for different MoE model variants.
 
+use policy::constants::models::ModelConfig;
 use pyo3::prelude::*;
 use pyo3::{Bound, PyAny};
 
@@ -41,5 +42,15 @@ impl<'py> IntoPyObject<'py> for RustModelType {
             RustModelType::PhiTinyMoe => "phi-tiny-moe",
         };
         Ok(value.into_pyobject(py).unwrap().into_any())
+    }
+}
+
+impl From<RustModelType> for ModelConfig {
+    fn from(model_type: RustModelType) -> Self {
+        match model_type {
+            RustModelType::GptOss20B => policy::constants::models::GPT_OSS_20B,
+            RustModelType::GptOss120B => policy::constants::models::GPT_OSS_120B,
+            RustModelType::PhiTinyMoe => policy::constants::models::PHI_TINY_MOE,
+        }
     }
 }
