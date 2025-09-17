@@ -28,7 +28,7 @@ impl AbstractExpert {
     pub fn new_with_validation(
         expert_id: usize,
         layer_id: usize,
-        config: &constants::models::ModelConfig,
+        config: &constants::ModelConfig,
     ) -> Result<Self, AbstractExpertError> {
         if layer_id >= config.total_layers {
             return Err(AbstractExpertError::InvalidLayer {
@@ -55,7 +55,7 @@ impl AbstractExpert {
     }
 
     /// Get all abstract experts for the entire model
-    pub fn all_experts(config: &constants::models::ModelConfig) -> Vec<Self> {
+    pub fn all_experts(config: &constants::ModelConfig) -> Vec<Self> {
         let mut experts = Vec::new();
         for layer_id in 0..config.total_layers {
             for expert_id in 0..config.experts_per_layer {

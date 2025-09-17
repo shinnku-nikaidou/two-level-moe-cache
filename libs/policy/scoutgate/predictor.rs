@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::AbstractExpert;
-use crate::constants::models::ModelConfig;
+use crate::constants::ModelConfig;
 use crate::timer::Timer;
 
 use super::config::ScoutGateConfig;
@@ -63,19 +63,19 @@ impl ScoutGatePredictor {
 
     /// Create ScoutGate predictor for GPT-OSS-20B model
     pub fn for_gptoss20b(timer: Rc<Timer>) -> Result<Self, ScoutGateError> {
-        use crate::constants::models::GPT_OSS_20B;
+        use crate::constants::GPT_OSS_20B;
         Self::new(timer, GPT_OSS_20B.clone(), ScoutGateConfig::default())
     }
 
     /// Create ScoutGate predictor for GPT-OSS-120B model
     pub fn for_gptoss120b(timer: Rc<Timer>) -> Result<Self, ScoutGateError> {
-        use crate::constants::models::GPT_OSS_120B;
+        use crate::constants::GPT_OSS_120B;
         Self::new(timer, GPT_OSS_120B.clone(), ScoutGateConfig::default())
     }
 
     /// Create ScoutGate predictor for Phi-Tiny-MoE model (for testing)
     pub fn for_phi_tiny_moe(timer: Rc<Timer>) -> Result<Self, ScoutGateError> {
-        use crate::constants::models::PHI_TINY_MOE;
+        use crate::constants::PHI_TINY_MOE;
         Self::new(timer, PHI_TINY_MOE.clone(), ScoutGateConfig::default())
     }
 

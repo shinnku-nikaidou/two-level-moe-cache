@@ -39,7 +39,7 @@ impl FusionConfig {
 
     /// Create configuration for GPT-OSS-20B model
     pub fn for_gptoss20b() -> Self {
-        use crate::constants::models::GPT_OSS_20B;
+        use crate::constants::GPT_OSS_20B;
         Self {
             eta: 0.5,
             gamma: 0.1,
@@ -49,7 +49,7 @@ impl FusionConfig {
 
     /// Create configuration for GPT-OSS-120B model
     pub fn for_gptoss120b() -> Self {
-        use crate::constants::models::GPT_OSS_120B;
+        use crate::constants::GPT_OSS_120B;
         Self {
             eta: 0.5,
             gamma: 0.1,
@@ -59,7 +59,7 @@ impl FusionConfig {
 
     /// Create configuration for Phi-Tiny-MoE model (for testing)
     pub fn for_phi_tiny_moe() -> Self {
-        use crate::constants::models::PHI_TINY_MOE;
+        use crate::constants::PHI_TINY_MOE;
         Self {
             eta: 0.5,
             gamma: 0.1,

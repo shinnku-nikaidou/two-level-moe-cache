@@ -3,7 +3,7 @@
 //! This module defines the core expert parameter types and keys used
 //! internally by the cache system, separate from the Python bindings.
 
-use policy::constants::models::ModelConfig;
+use policy::constants::ModelConfig;
 
 /// Expert parameter type for MoE expert weights
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
