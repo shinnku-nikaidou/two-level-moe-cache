@@ -287,6 +287,11 @@ impl WatermarkAlgorithm {
         self.vram_used_bytes = 0;
         self.ram_used_bytes = 0;
     }
+
+    /// Get reference to expert states for status reporting
+    pub fn expert_states(&self) -> &HashMap<ExpertKey, ExpertState> {
+        &self.expert_states
+    }
 }
 
 #[cfg(test)]

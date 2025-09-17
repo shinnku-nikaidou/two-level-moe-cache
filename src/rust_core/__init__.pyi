@@ -61,13 +61,22 @@ class WatermarkConfig:
     def ram_learning_rate(self) -> float: ...
     def validate(self) -> None: ...
 
+class ExpertStatus:
+    """Expert status information."""
+
+    def __init__(self, expert_key: ExpertKey, current_tier: int) -> None: ...
+    @property
+    def expert_key(self) -> ExpertKey: ...
+    @property
+    def current_tier(self) -> int: ...  # 0=VRAM, 1=RAM, 2=DISK
+    def __repr__(self) -> str: ...
+
 class TwoTireWmExpertCacheManager:
     """Two-tier watermark-based expert cache manager."""
 
     def __init__(
         self,
         model_type: str,  # ModelType string
-        total_layers: int,
         vram_capacity: int,  # Capacity in bytes
         ram_capacity: int,  # Capacity in bytes
     ) -> None: ...
@@ -82,7 +91,6 @@ class TwoTireWmExpertCacheManager:
     def step_forward(self) -> None:
         """Advance to next time step."""
         ...
-
     # New methods added during integration
     def current_time(self) -> int:
         """Get current time step."""
@@ -102,4 +110,8 @@ class TwoTireWmExpertCacheManager:
 
     def get_memory_usage(self) -> tuple[int, int]:
         """Get current memory usage (VRAM bytes, RAM bytes) for debugging."""
+        ...
+
+    def experts_status(self) -> List[ExpertStatus]:
+        """Get status of all tracked experts."""
         ...

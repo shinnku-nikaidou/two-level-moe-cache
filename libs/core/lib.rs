@@ -19,6 +19,7 @@ pub fn core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<types::expert::ExpertKey>()?;
     m.add_class::<types::config::WatermarkConfig>()?;
     m.add_class::<types::expert::ExpertParamType>()?;
+    m.add_class::<types::status::ExpertStatus>()?;
     m.add_class::<cache::manager::TwoTireWmExpertCacheManager>()?;
 
     Ok(())

@@ -9,7 +9,7 @@ import torch
 
 from ...boilerplate.gpt_oss.model import ModelConfig, swiglu, RMSNorm
 from ..cache.interfaces.expert_cache import IExpertCacheManager
-from ..cache.entities.types import ExpertKey, ExpertParamType
+from src.common.types import ExpertKey, ExpertParamType
 from src.config import TORCH_VRAM_DEVICE
 from .lazy_tensor import LazyExpertTensor
 

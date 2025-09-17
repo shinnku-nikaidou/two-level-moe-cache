@@ -10,7 +10,7 @@ import json
 from abc import ABC, abstractmethod
 from typing import Dict, List
 from ..entities.expert import Expert
-from ..entities.types import ExpertKey, ExpertParamType
+from src.common.types import ExpertKey, ExpertParamType
 from src.domain import ModelType
 from src.boilerplate.gpt_oss.model import ModelConfig
 from src.config.util import get_checkpoint_path

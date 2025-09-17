@@ -10,7 +10,7 @@ from collections import OrderedDict
 from typing import Dict, List, Optional, Set
 from ..cache.interfaces.expert_cache import IExpertCacheManager
 from ..cache.entities.expert import Expert
-from ..cache.entities.types import ExpertKey, MemoryTier
+from src.common.types import ExpertKey, MemoryTier
 from .. import ModelType
 
 

@@ -51,7 +51,7 @@ impl TwoTireWmExpertCacheManager {
             current_time: 0,
             fusion,
             watermark_algorithm,
-            all_experts: todo!(),
+            all_experts: Vec::new(), // Initialize with empty vector for now
         })
     }
 }

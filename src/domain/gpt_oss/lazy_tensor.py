@@ -1,7 +1,7 @@
 import torch
 from typing import List
 from ..cache.interfaces.expert_cache import IExpertCacheManager
-from ..cache.entities.types import ExpertKey, ExpertParamType
+from src.common.types import ExpertKey, ExpertParamType
 
 
 class LazyExpertTensor:

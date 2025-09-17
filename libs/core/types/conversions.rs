@@ -49,3 +49,15 @@ where
     }
     Ok(value)
 }
+
+/// Convert from policy::ExpertParamType to core::types::expert::ExpertParamType
+impl From<policy::ExpertParamType> for crate::types::expert::ExpertParamType {
+    fn from(policy_param_type: policy::ExpertParamType) -> Self {
+        match policy_param_type {
+            policy::ExpertParamType::MLP1Weight => Self::MLP1_WEIGHT,
+            policy::ExpertParamType::MLP1Bias => Self::MLP1_BIAS,
+            policy::ExpertParamType::MLP2Weight => Self::MLP2_WEIGHT,
+            policy::ExpertParamType::MLP2Bias => Self::MLP2_BIAS,
+        }
+    }
+}

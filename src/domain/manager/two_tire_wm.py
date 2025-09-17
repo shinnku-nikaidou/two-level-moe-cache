@@ -8,7 +8,7 @@ for watermark-based expert caching with dual-tier memory management.
 from typing import List
 from ..cache.interfaces.expert_cache import IExpertCacheManager
 from ..cache.entities.expert import Expert
-from ..cache.entities.types import ExpertKey
+from src.common.types import ExpertKey, MemoryTier
 from .. import ModelType
 from .utils import rust_model_type
 from rust_core import TwoTireWmExpertCacheManager as RustTwoTireWmExpertCacheManager
@@ -52,7 +52,6 @@ class TwoTireWmExpertCacheManager(IExpertCacheManager):
         # (model_type, total_layers, vram_capacity, ram_capacity)
         self._rust_cache = RustTwoTireWmExpertCacheManager(
             rust_model_type(model_type),
-            self._config.num_hidden_layers,
             vram_capacity_mb * 1024 * 1024,
             ram_capacity_mb * 1024 * 1024,
         )
@@ -84,6 +83,8 @@ class TwoTireWmExpertCacheManager(IExpertCacheManager):
             self.layer_idx_now = first_layer
             self.update_activations([key.expert_id for key in keys])
 
+        self.sync_back()
+
         experts = []
         for key in keys:
             expert = self.get(key)
@@ -91,6 +92,59 @@ class TwoTireWmExpertCacheManager(IExpertCacheManager):
         return experts
 
     def clear(self) -> None: ...
+    
+    def sync_back(self) -> None:
+        """
+        Synchronize expert states from Rust backend to Python Expert instances.
+        """
+        rust_experts_status = self._rust_cache.experts_status()
+        
+        # Sync Rust-side states to Expert instances in self._experts
+        for expert_status in rust_experts_status:
+            expert_key = expert_status.expert_key
+            rust_tier = MemoryTier(expert_status.current_tier)
+            
+            # Get the corresponding Expert instance
+            if expert_key in self._experts:
+                expert = self._experts[expert_key]
+                
+                # Adjust Expert instance memory tier based on Rust-side state
+                current_python_tier = expert.current_tier
+                
+                if current_python_tier != rust_tier:
+                    self._sync_expert_tier(expert, rust_tier)
+
+    def _sync_expert_tier(self, expert: Expert, target_tier: MemoryTier) -> None:
+        """
+        Synchronize a single Expert's memory tier to the target tier.
+        
+        Args:
+            expert: Expert instance to synchronize
+            target_tier: Target tier indicated by Rust backend
+        """
+        current_tier = expert.current_tier
+        
+        if current_tier == target_tier:
+            return  # Already at correct tier
+        
+        # Adjust Expert state based on target tier
+        if target_tier == MemoryTier.VRAM:
+            # Need to promote to VRAM
+            if current_tier == MemoryTier.DISK:
+                expert.nvme_to_vram()  # DISK -> VRAM (also creates RAM copy)
+            elif current_tier == MemoryTier.RAM:
+                expert.ram_to_vram()   # RAM -> VRAM
+                
+        elif target_tier == MemoryTier.RAM:
+            # Need to be at RAM tier
+            if current_tier == MemoryTier.DISK:
+                expert.nvme_to_ram()   # DISK -> RAM
+            elif current_tier == MemoryTier.VRAM:
+                expert.vram_to_ram()   # VRAM -> RAM
+                
+        elif target_tier == MemoryTier.DISK:
+            # Need to unload to DISK
+            expert.unload()  # Clear all memory copies
 
     def next(self) -> None:
         """Advance to next time step and apply watermark decisions."""

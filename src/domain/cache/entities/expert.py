@@ -9,7 +9,7 @@ from src.domain import ModelType
 from src.adapters.expert.factory import AdapterFactory
 from src.adapters.expert.base import ExpertAdapter
 from src.config import TORCH_VRAM_DEVICE, TORCH_RAM_DEVICE
-from .types import ExpertKey, MemoryTier
+from src.common.types import ExpertKey, MemoryTier
 
 
 class Expert:

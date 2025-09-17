@@ -5,7 +5,7 @@ Expert weight loading adapters.
 from abc import ABC, abstractmethod
 from typing import Optional
 import torch
-from src.domain.cache.entities.types import ExpertKey
+from src.common.types import ExpertKey
 
 
 class ExpertAdapter(ABC):

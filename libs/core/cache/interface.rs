@@ -4,7 +4,8 @@
 //! for the TwoTireWmExpertCacheManager.
 
 use super::manager::TwoTireWmExpertCacheManager;
-use crate::types::{expert::ExpertKey, model::ModelType};
+use crate::types::{expert::ExpertKey, model::ModelType, status::ExpertStatus};
+use policy::watermark::MemoryTier;
 use pyo3::prelude::*;
 
 #[pymethods]
@@ -28,7 +29,7 @@ impl TwoTireWmExpertCacheManager {
     }
 
     /// Update with new layer activations - placeholder for integration with EWMA/ScoutGate
-    pub fn update_activations(&mut self, _activated_experts: Vec<usize>) -> PyResult<()> {
+    pub fn update_activations(&mut self, activated_experts: Vec<usize>) -> PyResult<()> {
         // This would update EWMA predictors and ScoutGate with activation data
         // For now it's a placeholder
         Ok(())
@@ -66,5 +67,29 @@ impl TwoTireWmExpertCacheManager {
     /// Get memory usage for debugging
     pub fn get_memory_usage(&self) -> (usize, usize) {
         self.watermark_algorithm.get_memory_usage()
+    }
+
+    /// Get simplified status of all tracked experts
+    pub fn experts_status(&self) -> Vec<ExpertStatus> {
+        self.watermark_algorithm
+            .expert_states()
+            .iter()
+            .map(|(_, expert_state)| {
+                let tier_u8 = match expert_state.current_tier {
+                    MemoryTier::VRAM => 0,
+                    MemoryTier::RAM => 1,
+                    MemoryTier::Disk => 2,
+                };
+                
+                // Convert policy::ExpertKey to core::types::expert::ExpertKey
+                let core_expert_key = ExpertKey::new(
+                    expert_state.expert_key.layer_id,
+                    expert_state.expert_key.expert_id,
+                    expert_state.expert_key.param_type.into(),
+                );
+                
+                ExpertStatus::new(core_expert_key, tier_u8)
+            })
+            .collect()
     }
 }

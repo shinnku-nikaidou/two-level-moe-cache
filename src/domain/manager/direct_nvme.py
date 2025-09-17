@@ -9,7 +9,7 @@ No persistence, no LRU management - maximum simplicity for maximum performance.
 from typing import List, Set
 from src.domain.cache.interfaces.expert_cache import IExpertCacheManager
 from src.domain.cache.entities.expert import Expert
-from src.domain.cache.entities.types import ExpertKey
+from src.common.types import ExpertKey
 from src.domain import ModelType
 
 
