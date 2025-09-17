@@ -83,6 +83,7 @@ class TwoTireWmExpertCacheManager(IExpertCacheManager):
             self.layer_idx_now = first_layer
             self.update_activations([key.expert_id for key in keys])
 
+        # 
         self.sync_back()
 
         experts = []
@@ -148,7 +149,7 @@ class TwoTireWmExpertCacheManager(IExpertCacheManager):
             # Need to unload to DISK
             expert.unload()  # Clear all memory copies
 
-    def next(self) -> None:
+    def step_forward(self) -> None:
         """Advance to next time step and apply watermark decisions."""
         # Use step_forward which is the actual method in Rust implementation
         self._rust_cache.step_forward()

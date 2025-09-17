@@ -38,9 +38,6 @@ impl RustTwoTireWmExpertCacheManager {
     /// Advance to next time step
     pub fn step_forward(&mut self) -> PyResult<()> {
         self.timer.step();
-        // Step the watermark algorithm
-        self.watermark_algorithm.step();
-
         Ok(())
     }
 
@@ -51,8 +48,8 @@ impl RustTwoTireWmExpertCacheManager {
             .iter()
             .flat_map(|(expert, expert_state)| {
                 let tier_u8 = match expert_state.current_tier {
-                    MemoryTier::VRAM => 0,
-                    MemoryTier::RAM => 1,
+                    MemoryTier::Vram => 0,
+                    MemoryTier::Ram => 1,
                     MemoryTier::Disk => 2,
                 };
 

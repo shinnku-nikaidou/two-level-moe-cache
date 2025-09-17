@@ -145,5 +145,5 @@ class DirectNVMEExpertCacheManager(IExpertCacheManager):
 
         return unloaded_count
 
-    def next(self) -> None:
+    def step_forward(self) -> None:
         pass

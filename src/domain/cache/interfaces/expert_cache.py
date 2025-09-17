@@ -167,7 +167,7 @@ class IExpertCacheManager(ABC):
         pass
 
     @abstractmethod
-    def next(self) -> None:
+    def step_forward(self) -> None:
         """
         Advance internal state for time-based policies.
 

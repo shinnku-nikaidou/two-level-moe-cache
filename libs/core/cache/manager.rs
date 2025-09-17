@@ -4,7 +4,12 @@
 //! core data structures, serving as a thin Python interface layer.
 
 use crate::types::model::RustModelType;
-use policy::{fusion::ProbabilityFusion, timer::Timer, watermark::WatermarkAlgorithm};
+use policy::{
+    constants::{ModelConfig, ModelType},
+    fusion::ProbabilityFusion,
+    timer::Timer,
+    watermark::WatermarkAlgorithm,
+};
 use pyo3::prelude::*;
 /// Thin Python interface for the two-level MOE cache system
 ///
@@ -54,13 +59,15 @@ impl RustTwoTireWmExpertCacheManager {
         ram_capacity: usize,
     ) -> Result<Self, String> {
         // Get model configuration from model_type using From trait
-        let config = model_type.into();
+        let config: ModelConfig = model_type.clone().into();
+        let model_type_enum: ModelType = model_type.into();
 
         // Create probability fusion
         let probability_fuser = ProbabilityFusion::for_gptoss20b();
 
         // Create watermark algorithm
-        let watermark_algorithm = WatermarkAlgorithm::for_gptoss20b(vram_capacity, ram_capacity);
+        let watermark_algorithm =
+            WatermarkAlgorithm::from_model(model_type_enum, vram_capacity, ram_capacity);
 
         // Create timer from model configuration
         let timer = Timer::from_model(&config);

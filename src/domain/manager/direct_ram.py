@@ -148,7 +148,7 @@ class DirectRAMExpertCacheManager(IExpertCacheManager):
         # Clear VRAM tracking set
         self._vram_expert_keys.clear()
 
-    def next(self) -> None:
+    def step_forward(self) -> None:
         """
         Batch evict all VRAM copies while keeping RAM cache intact.
 

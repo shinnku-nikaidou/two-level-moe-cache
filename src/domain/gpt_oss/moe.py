@@ -143,7 +143,7 @@ class LazyMLPBlock(torch.nn.Module):
         t_output = torch.einsum("bec,be->bc", t_mlp2, expert_weights)
 
         # Clean up VRAM after computation (keep RAM cache warm)
-        self.expert_cache.next()
+        self.expert_cache.step_forward()
 
         # Residual connection - no manual memory management needed!
         return x + t_output

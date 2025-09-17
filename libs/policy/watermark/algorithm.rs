@@ -6,11 +6,12 @@
 //! 2. Watermark updates: λ_G ← [λ_G + η_G(usage - K_G)]_+, λ_R ← [λ_R + η_R(usage - K_R)]_+
 //! 3. Cache decisions: Keep in tier iff b >= λ
 
-use std::collections::HashMap;
-
 use super::config::WatermarkConfig;
 use super::error::WatermarkError;
 use crate::AbstractExpert;
+use crate::constants::ModelType;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Cache decision for an expert
 #[derive(Debug, Clone, PartialEq)]
@@ -30,11 +31,11 @@ pub enum CacheDecision {
 }
 
 /// Memory tier for expert residence
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum MemoryTier {
-    VRAM,
-    RAM,
-    Disk,
+    Vram = 0, // GPU memory - fastest, most limited
+    Ram = 1,  // System memory - fast, moderate capacity
+    Disk = 2, // NVMe/SSD storage - slower, largest capacity
 }
 
 /// Expert state for watermark tracking
@@ -83,9 +84,13 @@ impl WatermarkAlgorithm {
         }
     }
 
-    /// Create watermark algorithm for GPT-OSS-20B model
-    pub fn for_gptoss20b(vram_capacity_mb: usize, ram_capacity_mb: usize) -> Self {
-        let config = WatermarkConfig::for_gptoss20b(vram_capacity_mb, ram_capacity_mb);
+    /// Create watermark algorithm from model type
+    pub fn from_model(
+        model_type: ModelType,
+        vram_capacity_mb: usize,
+        ram_capacity_mb: usize,
+    ) -> Self {
+        let config = WatermarkConfig::from_model(model_type, vram_capacity_mb, ram_capacity_mb);
         Self::new(config)
     }
 
@@ -129,14 +134,14 @@ impl WatermarkAlgorithm {
 
             // Make cache decision based on current tier and watermarks
             let decision = match current_tier {
-                MemoryTier::VRAM => {
+                MemoryTier::Vram => {
                     if vram_benefit >= self.vram_watermark {
                         CacheDecision::KeepInVRAM
                     } else {
                         CacheDecision::DemoteToRAM
                     }
                 }
-                MemoryTier::RAM => {
+                MemoryTier::Ram => {
                     if ram_benefit >= self.ram_watermark {
                         CacheDecision::KeepInRAM
                     } else {
@@ -213,25 +218,25 @@ impl WatermarkAlgorithm {
 
         match decision {
             CacheDecision::PromoteToVRAM => {
-                if expert_state.current_tier == MemoryTier::RAM {
+                if expert_state.current_tier == MemoryTier::Ram {
                     self.vram_used_bytes += expert_state.size_bytes;
-                    expert_state.current_tier = MemoryTier::VRAM;
+                    expert_state.current_tier = MemoryTier::Vram;
                 }
             }
             CacheDecision::DemoteToRAM => {
-                if expert_state.current_tier == MemoryTier::VRAM {
+                if expert_state.current_tier == MemoryTier::Vram {
                     self.vram_used_bytes -= expert_state.size_bytes;
-                    expert_state.current_tier = MemoryTier::RAM;
+                    expert_state.current_tier = MemoryTier::Ram;
                 }
             }
             CacheDecision::LoadToRAM => {
                 if expert_state.current_tier == MemoryTier::Disk {
                     self.ram_used_bytes += expert_state.size_bytes;
-                    expert_state.current_tier = MemoryTier::RAM;
+                    expert_state.current_tier = MemoryTier::Ram;
                 }
             }
             CacheDecision::EvictToDisk => {
-                if expert_state.current_tier == MemoryTier::RAM {
+                if expert_state.current_tier == MemoryTier::Ram {
                     self.ram_used_bytes -= expert_state.size_bytes;
                     expert_state.current_tier = MemoryTier::Disk;
                 }

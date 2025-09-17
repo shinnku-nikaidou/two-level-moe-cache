@@ -68,7 +68,7 @@ class LazyExpertTensor:
         batch_size, experts_per_token = expert_indices.shape
 
         # Linear collection of expert keys (no optimization)
-        expert_keys = []
+        expert_keys: List[ExpertKey] = []
         for b in range(batch_size):
             for e in range(experts_per_token):
                 expert_id = int(expert_indices[b, e].item())

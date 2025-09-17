@@ -3,6 +3,8 @@
 //! This module provides configuration structures for the dual watermark
 //! algorithm that manages two-tier expert caching based on benefit density.
 
+use crate::constants::ModelType;
+
 /// Configuration for dual watermark algorithm
 #[derive(Debug, Clone, PartialEq)]
 pub struct WatermarkConfig {
@@ -67,6 +69,22 @@ impl WatermarkConfig {
             0.005,
             0.005,
         )
+    }
+
+    /// Create configuration from model type with default memory capacities
+    pub fn from_model(
+        model_type: ModelType,
+        vram_capacity_mb: usize,
+        ram_capacity_mb: usize,
+    ) -> Self {
+        match model_type {
+            ModelType::GptOss20B => Self::for_gptoss20b(vram_capacity_mb, ram_capacity_mb),
+            ModelType::GptOss120B => Self::for_gptoss120b(vram_capacity_mb, ram_capacity_mb),
+            ModelType::PhiTinyMoe => {
+                // Use GPT-OSS-20B settings for now
+                Self::for_gptoss20b(vram_capacity_mb, ram_capacity_mb)
+            }
+        }
     }
 
     /// Validate configuration parameters

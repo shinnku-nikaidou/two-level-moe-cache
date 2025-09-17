@@ -3,6 +3,7 @@
 //! This module defines the MemoryTier enumeration that represents different
 //! storage tiers in the two-level cache hierarchy.
 
+use policy::watermark::MemoryTier;
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -10,44 +11,37 @@ use serde::{Deserialize, Serialize};
 #[pyclass]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct RustMemoryTier {
-    value: MemoryTierEnum,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-enum MemoryTierEnum {
-    VRAM = 0, // GPU memory - fastest, most limited
-    RAM = 1,  // System memory - fast, moderate capacity
-    DISK = 2, // NVMe/SSD storage - slower, largest capacity
+    value: MemoryTier,
 }
 
 #[pymethods]
 impl RustMemoryTier {
     #[classattr]
     pub const VRAM: Self = Self {
-        value: MemoryTierEnum::VRAM,
+        value: MemoryTier::Vram,
     };
 
     #[classattr]
     pub const RAM: Self = Self {
-        value: MemoryTierEnum::RAM,
+        value: MemoryTier::Ram,
     };
 
     #[classattr]
     pub const DISK: Self = Self {
-        value: MemoryTierEnum::DISK,
+        value: MemoryTier::Disk,
     };
 
     #[new]
     fn new(value: i32) -> PyResult<Self> {
         match value {
             0 => Ok(Self {
-                value: MemoryTierEnum::VRAM,
+                value: MemoryTier::Vram,
             }),
             1 => Ok(Self {
-                value: MemoryTierEnum::RAM,
+                value: MemoryTier::Ram,
             }),
             2 => Ok(Self {
-                value: MemoryTierEnum::DISK,
+                value: MemoryTier::Disk,
             }),
             _ => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
                 "Invalid MemoryTier value: {}",
@@ -58,9 +52,9 @@ impl RustMemoryTier {
 
     fn __str__(&self) -> &'static str {
         match self.value {
-            MemoryTierEnum::VRAM => "VRAM",
-            MemoryTierEnum::RAM => "RAM",
-            MemoryTierEnum::DISK => "DISK",
+            MemoryTier::Vram => "VRAM",
+            MemoryTier::Ram => "RAM",
+            MemoryTier::Disk => "DISK",
         }
     }
 
