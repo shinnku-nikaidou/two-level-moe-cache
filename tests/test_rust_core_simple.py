@@ -56,9 +56,9 @@ def test_rust_core_basic():
     # Test creating TwoTireWmExpertCacheManager
     cache_manager = TwoTireWmExpertCacheManager(
         model_type="gpt-oss-20b",
-        total_layers=24, 
+        total_layers=24,
         vram_capacity=1024 * 1024 * 1024,  # 1GB
-        ram_capacity=4096 * 1024 * 1024,   # 4GB
+        ram_capacity=4096 * 1024 * 1024,  # 4GB
     )
     print("✅ TwoTireWmExpertCacheManager created successfully")
 

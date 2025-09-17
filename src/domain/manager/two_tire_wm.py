@@ -11,7 +11,7 @@ from ..cache.entities.expert import Expert
 from src.common.types import ExpertKey, MemoryTier
 from .. import ModelType
 from .utils import rust_model_type
-from rust_core import TwoTireWmExpertCacheManager as RustTwoTireWmExpertCacheManager
+from rust_core import RustTwoTireWmExpertCacheManager
 
 
 class TwoTireWmExpertCacheManager(IExpertCacheManager):
@@ -92,56 +92,56 @@ class TwoTireWmExpertCacheManager(IExpertCacheManager):
         return experts
 
     def clear(self) -> None: ...
-    
+
     def sync_back(self) -> None:
         """
         Synchronize expert states from Rust backend to Python Expert instances.
         """
         rust_experts_status = self._rust_cache.experts_status()
-        
+
         # Sync Rust-side states to Expert instances in self._experts
         for expert_status in rust_experts_status:
             expert_key = expert_status.expert_key
             rust_tier = MemoryTier(expert_status.current_tier)
-            
+
             # Get the corresponding Expert instance
             if expert_key in self._experts:
                 expert = self._experts[expert_key]
-                
+
                 # Adjust Expert instance memory tier based on Rust-side state
                 current_python_tier = expert.current_tier
-                
+
                 if current_python_tier != rust_tier:
                     self._sync_expert_tier(expert, rust_tier)
 
     def _sync_expert_tier(self, expert: Expert, target_tier: MemoryTier) -> None:
         """
         Synchronize a single Expert's memory tier to the target tier.
-        
+
         Args:
             expert: Expert instance to synchronize
             target_tier: Target tier indicated by Rust backend
         """
         current_tier = expert.current_tier
-        
+
         if current_tier == target_tier:
             return  # Already at correct tier
-        
+
         # Adjust Expert state based on target tier
         if target_tier == MemoryTier.VRAM:
             # Need to promote to VRAM
             if current_tier == MemoryTier.DISK:
                 expert.nvme_to_vram()  # DISK -> VRAM (also creates RAM copy)
             elif current_tier == MemoryTier.RAM:
-                expert.ram_to_vram()   # RAM -> VRAM
-                
+                expert.ram_to_vram()  # RAM -> VRAM
+
         elif target_tier == MemoryTier.RAM:
             # Need to be at RAM tier
             if current_tier == MemoryTier.DISK:
-                expert.nvme_to_ram()   # DISK -> RAM
+                expert.nvme_to_ram()  # DISK -> RAM
             elif current_tier == MemoryTier.VRAM:
-                expert.vram_to_ram()   # VRAM -> RAM
-                
+                expert.vram_to_ram()  # VRAM -> RAM
+
         elif target_tier == MemoryTier.DISK:
             # Need to unload to DISK
             expert.unload()  # Clear all memory copies

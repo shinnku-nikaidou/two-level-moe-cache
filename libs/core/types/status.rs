@@ -3,7 +3,7 @@
 //! This module defines the ExpertStatus structure used to communicate
 //! expert cache state from Rust to Python.
 
-use super::expert::ExpertKey;
+use super::expert::RustExpertKey;
 use pyo3::prelude::*;
 
 /// Simplified expert status information
@@ -13,10 +13,10 @@ use pyo3::prelude::*;
 /// - current_tier: Memory tier where expert currently resides (0=VRAM, 1=RAM, 2=DISK)
 #[pyclass]
 #[derive(Debug, Clone)]
-pub struct ExpertStatus {
+pub struct RustExpertStatus {
     /// Expert unique identifier
     #[pyo3(get)]
-    pub expert_key: ExpertKey,
+    pub expert_key: RustExpertKey,
 
     /// Current memory tier as u8: VRAM=0, RAM=1, DISK=2
     #[pyo3(get)]
@@ -24,10 +24,10 @@ pub struct ExpertStatus {
 }
 
 #[pymethods]
-impl ExpertStatus {
+impl RustExpertStatus {
     /// Create a new expert status
     #[new]
-    pub fn new(expert_key: ExpertKey, current_tier: u8) -> Self {
+    pub fn new(expert_key: RustExpertKey, current_tier: u8) -> Self {
         Self {
             expert_key,
             current_tier,

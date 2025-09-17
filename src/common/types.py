@@ -2,7 +2,7 @@
 Core types for the two-level MOE cache system.
 
 This module contains fundamental type definitions that are used across
-the entire codebase. It should have minimal dependencies to avoid 
+the entire codebase. It should have minimal dependencies to avoid
 circular imports.
 """
 

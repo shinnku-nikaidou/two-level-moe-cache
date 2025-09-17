@@ -8,7 +8,7 @@ use pyo3::prelude::*;
 /// Configuration for watermark algorithm
 #[pyclass]
 #[derive(Debug, Clone)]
-pub struct WatermarkConfig {
+pub struct RustWatermarkConfig {
     #[pyo3(get, set)]
     pub vram_capacity: usize,
     #[pyo3(get, set)]
@@ -24,7 +24,7 @@ pub struct WatermarkConfig {
 }
 
 #[pymethods]
-impl WatermarkConfig {
+impl RustWatermarkConfig {
     #[new]
     #[pyo3(signature = (vram_capacity, ram_capacity, vram_learning_rate=None, ram_learning_rate=None, fusion_eta=None, reuse_decay_gamma=None))]
     pub fn new(

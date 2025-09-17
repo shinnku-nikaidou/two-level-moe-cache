@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 /// Memory tier enumeration matching Python's MemoryTier
 #[pyclass]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct MemoryTier {
+pub struct RustMemoryTier {
     value: MemoryTierEnum,
 }
 
@@ -21,7 +21,7 @@ enum MemoryTierEnum {
 }
 
 #[pymethods]
-impl MemoryTier {
+impl RustMemoryTier {
     #[classattr]
     pub const VRAM: Self = Self {
         value: MemoryTierEnum::VRAM,

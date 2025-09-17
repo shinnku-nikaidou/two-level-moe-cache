@@ -3,6 +3,7 @@
 //! This module defines the main TwoTireWmExpertCacheManager struct and its
 //! core data structures, serving as a thin Python interface layer.
 
+use crate::types::model::ModelType;
 use policy::{
     ExpertKey,
     fusion::{FusionConfig, ProbabilityFusion},
@@ -10,14 +11,12 @@ use policy::{
 };
 use pyo3::prelude::*;
 
-use crate::types::model::ModelType;
-
 /// Thin Python interface for the two-level MOE cache system
 ///
 /// This is the CORRECT architecture implementation:
 /// Core layer is ONLY a Python interface - all business logic in policy layer
 #[pyclass]
-pub struct TwoTireWmExpertCacheManager {
+pub struct RustTwoTireWmExpertCacheManager {
     /// Current time for tracking
     pub(crate) current_time: u64,
 
@@ -31,7 +30,7 @@ pub struct TwoTireWmExpertCacheManager {
     pub(crate) watermark_algorithm: WatermarkAlgorithm,
 }
 
-impl TwoTireWmExpertCacheManager {
+impl RustTwoTireWmExpertCacheManager {
     /// Create a new cache manager instance
     pub fn new(
         _model_type: ModelType,

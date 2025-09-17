@@ -50,8 +50,8 @@ where
     Ok(value)
 }
 
-/// Convert from policy::ExpertParamType to core::types::expert::ExpertParamType
-impl From<policy::ExpertParamType> for crate::types::expert::ExpertParamType {
+/// Convert from policy::ExpertParamType to core::types::expert::RustExpertParamType
+impl From<policy::ExpertParamType> for crate::types::expert::RustExpertParamType {
     fn from(policy_param_type: policy::ExpertParamType) -> Self {
         match policy_param_type {
             policy::ExpertParamType::MLP1Weight => Self::MLP1_WEIGHT,

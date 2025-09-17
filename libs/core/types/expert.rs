@@ -6,58 +6,41 @@
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 
-/// Expert parameter type matching Python's ExpertParamType
+/// Parameter type enumeration for PyO3
 #[pyclass]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct ExpertParamType {
-    value: ExpertParamTypeEnum,
+pub struct RustExpertParamType {
+    value: u8,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-enum ExpertParamTypeEnum {
-    MLP1Weight,
-    MLP1Bias,
-    MLP2Weight,
-    MLP2Bias,
+impl RustExpertParamType {
+    pub const MLP1_WEIGHT: RustExpertParamType = RustExpertParamType { value: 0 };
+    pub const MLP1_BIAS: RustExpertParamType = RustExpertParamType { value: 1 };
+    pub const MLP2_WEIGHT: RustExpertParamType = RustExpertParamType { value: 2 };
+    pub const MLP2_BIAS: RustExpertParamType = RustExpertParamType { value: 3 };
 }
 
 #[pymethods]
-impl ExpertParamType {
+impl RustExpertParamType {
     #[classattr]
-    pub const MLP1_WEIGHT: Self = Self {
-        value: ExpertParamTypeEnum::MLP1Weight,
-    };
+    pub const PY_MLP1_WEIGHT: Self = Self::MLP1_WEIGHT;
 
     #[classattr]
-    pub const MLP1_BIAS: Self = Self {
-        value: ExpertParamTypeEnum::MLP1Bias,
-    };
+    pub const PY_MLP1_BIAS: Self = Self::MLP1_BIAS;
 
     #[classattr]
-    pub const MLP2_WEIGHT: Self = Self {
-        value: ExpertParamTypeEnum::MLP2Weight,
-    };
+    pub const PY_MLP2_WEIGHT: Self = Self::MLP2_WEIGHT;
 
     #[classattr]
-    pub const MLP2_BIAS: Self = Self {
-        value: ExpertParamTypeEnum::MLP2Bias,
-    };
+    pub const PY_MLP2_BIAS: Self = Self::MLP2_BIAS;
 
     #[new]
     fn new(value: &str) -> PyResult<Self> {
         match value {
-            "mlp1_weight" => Ok(Self {
-                value: ExpertParamTypeEnum::MLP1Weight,
-            }),
-            "mlp1_bias" => Ok(Self {
-                value: ExpertParamTypeEnum::MLP1Bias,
-            }),
-            "mlp2_weight" => Ok(Self {
-                value: ExpertParamTypeEnum::MLP2Weight,
-            }),
-            "mlp2_bias" => Ok(Self {
-                value: ExpertParamTypeEnum::MLP2Bias,
-            }),
+            "mlp1_weight" => Ok(Self::MLP1_WEIGHT),
+            "mlp1_bias" => Ok(Self::MLP1_BIAS),
+            "mlp2_weight" => Ok(Self::MLP2_WEIGHT),
+            "mlp2_bias" => Ok(Self::MLP2_BIAS),
             _ => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
                 "Invalid ExpertParamType value: {}",
                 value
@@ -67,15 +50,16 @@ impl ExpertParamType {
 
     fn __str__(&self) -> &'static str {
         match self.value {
-            ExpertParamTypeEnum::MLP1Weight => "mlp1_weight",
-            ExpertParamTypeEnum::MLP1Bias => "mlp1_bias",
-            ExpertParamTypeEnum::MLP2Weight => "mlp2_weight",
-            ExpertParamTypeEnum::MLP2Bias => "mlp2_bias",
+            0 => "mlp1_weight",
+            1 => "mlp1_bias",
+            2 => "mlp2_weight",
+            3 => "mlp2_bias",
+            _ => "unknown",
         }
     }
 
     fn __repr__(&self) -> String {
-        format!("ExpertParamType('{}')", self.__str__())
+        format!("RustExpertParamType('{}')", self.__str__())
     }
 
     fn __eq__(&self, other: &Self) -> bool {
@@ -95,19 +79,19 @@ impl ExpertParamType {
 /// Expert key matching Python's ExpertKey dataclass
 #[pyclass]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct ExpertKey {
+pub struct RustExpertKey {
     #[pyo3(get, set)]
     pub layer_idx: usize,
     #[pyo3(get, set)]
     pub expert_id: usize,
     #[pyo3(get, set)]
-    pub param_type: ExpertParamType,
+    pub param_type: RustExpertParamType,
 }
 
 #[pymethods]
-impl ExpertKey {
+impl RustExpertKey {
     #[new]
-    pub fn new(layer_idx: usize, expert_id: usize, param_type: ExpertParamType) -> Self {
+    pub fn new(layer_idx: usize, expert_id: usize, param_type: RustExpertParamType) -> Self {
         Self {
             layer_idx,
             expert_id,
