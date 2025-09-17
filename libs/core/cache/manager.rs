@@ -3,9 +3,9 @@
 //! This module defines the main TwoTireWmExpertCacheManager struct and its
 //! core data structures, serving as a thin Python interface layer.
 
+use crate::types::core_expert::ExpertKey;
 use crate::types::model::RustModelType;
 use policy::{
-    ExpertKey,
     constants::models::ModelConfig,
     fusion::{FusionConfig, ProbabilityFusion},
     watermark::WatermarkAlgorithm,

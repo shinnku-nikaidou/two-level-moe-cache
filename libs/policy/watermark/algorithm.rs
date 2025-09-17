@@ -10,7 +10,7 @@ use std::collections::HashMap;
 
 use super::config::WatermarkConfig;
 use super::error::WatermarkError;
-use crate::ExpertKey;
+use crate::AbstractExpert;
 
 /// Cache decision for an expert
 #[derive(Debug, Clone, PartialEq)]
@@ -40,7 +40,7 @@ pub enum MemoryTier {
 /// Expert state for watermark tracking
 #[derive(Debug, Clone)]
 pub struct ExpertState {
-    pub expert_key: ExpertKey,
+    pub expert: AbstractExpert,
     pub current_tier: MemoryTier,
     pub size_bytes: usize,
     pub last_access_time: u64,
@@ -62,7 +62,7 @@ pub struct WatermarkAlgorithm {
     current_time: u64,
 
     /// Expert state tracking
-    expert_states: HashMap<ExpertKey, ExpertState>,
+    expert_states: HashMap<AbstractExpert, ExpertState>,
 
     /// Current memory usage
     vram_used_bytes: usize,
@@ -114,22 +114,22 @@ impl WatermarkAlgorithm {
     /// - Generate appropriate cache decisions
     pub fn make_cache_decisions(
         &mut self,
-        fused_probabilities: &HashMap<ExpertKey, f64>,
-    ) -> Result<HashMap<ExpertKey, CacheDecision>, WatermarkError> {
+        fused_probabilities: &HashMap<AbstractExpert, f64>,
+    ) -> Result<HashMap<AbstractExpert, CacheDecision>, WatermarkError> {
         let mut decisions = HashMap::new();
 
-        for (expert_key, &probability) in fused_probabilities {
+        for (expert, &probability) in fused_probabilities {
             // Validate probability
             if !(0.0..=1.0).contains(&probability) {
                 return Err(WatermarkError::InvalidProbability {
-                    expert_key: format!("{:?}", expert_key),
+                    expert_key: format!("{:?}", expert),
                     probability,
                 });
             }
 
             // Get or create expert state
             let current_tier = {
-                let expert_state = self.get_or_create_expert_state(*expert_key);
+                let expert_state = self.get_or_create_expert_state(*expert);
                 expert_state.current_tier
             };
 
@@ -164,7 +164,7 @@ impl WatermarkAlgorithm {
                 }
             };
 
-            decisions.insert(*expert_key, decision);
+            decisions.insert(*expert, decision);
         }
 
         Ok(decisions)
@@ -202,11 +202,11 @@ impl WatermarkAlgorithm {
     }
 
     /// Get or create expert state for tracking
-    fn get_or_create_expert_state(&mut self, expert_key: ExpertKey) -> &mut ExpertState {
+    fn get_or_create_expert_state(&mut self, expert: AbstractExpert) -> &mut ExpertState {
         self.expert_states
-            .entry(expert_key)
+            .entry(expert)
             .or_insert_with(|| ExpertState {
-                expert_key,
+                expert,
                 current_tier: MemoryTier::Disk,
                 size_bytes: self.config.expert_size_bytes,
                 last_access_time: self.current_time,
@@ -216,13 +216,13 @@ impl WatermarkAlgorithm {
     /// Apply cache decision (for simulation/testing)
     pub fn apply_decision(
         &mut self,
-        expert_key: ExpertKey,
+        expert: AbstractExpert,
         decision: CacheDecision,
     ) -> Result<(), WatermarkError> {
         let expert_state = self
             .expert_states
-            .get_mut(&expert_key)
-            .ok_or_else(|| WatermarkError::ExpertNotFound(format!("{:?}", expert_key)))?;
+            .get_mut(&expert)
+            .ok_or_else(|| WatermarkError::ExpertNotFound(format!("{:?}", expert)))?;
 
         match decision {
             CacheDecision::PromoteToVRAM => {
@@ -289,7 +289,7 @@ impl WatermarkAlgorithm {
     }
 
     /// Get reference to expert states for status reporting
-    pub fn expert_states(&self) -> &HashMap<ExpertKey, ExpertState> {
+    pub fn expert_states(&self) -> &HashMap<AbstractExpert, ExpertState> {
         &self.expert_states
     }
 }
@@ -309,7 +309,7 @@ mod tests {
     fn test_benefit_density_calculation() {
         let algorithm = WatermarkAlgorithm::for_testing();
         let expert_state = ExpertState {
-            expert_key: ExpertKey::expert_level(0, 0),
+            expert: AbstractExpert::new(0, 0),
             current_tier: MemoryTier::Disk,
             size_bytes: 1024 * 1024, // 1MB
             last_access_time: 0,
@@ -327,12 +327,12 @@ mod tests {
         let mut algorithm = WatermarkAlgorithm::for_testing();
 
         let mut fused_probs = HashMap::new();
-        let expert_key = ExpertKey::expert_level(0, 0);
-        fused_probs.insert(expert_key, 0.8);
+        let expert = AbstractExpert::new(0, 0);
+        fused_probs.insert(expert, 0.8);
 
         let decisions = algorithm.make_cache_decisions(&fused_probs).unwrap();
 
         // Expert starts on disk, should be loaded to RAM if benefit > watermark
-        assert!(decisions.contains_key(&expert_key));
+        assert!(decisions.contains_key(&expert));
     }
 }

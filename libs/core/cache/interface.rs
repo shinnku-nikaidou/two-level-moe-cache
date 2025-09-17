@@ -81,11 +81,12 @@ impl RustTwoTireWmExpertCacheManager {
                     MemoryTier::Disk => 2,
                 };
 
-                // Convert policy::ExpertKey to core::types::expert::ExpertKey
+                // Convert policy AbstractExpert to core ExpertKey (we need to add param_type)
+                // For now, use MLP1Weight as default param type since AbstractExpert doesn't have param_type
                 let core_expert_key = RustExpertKey::new(
-                    expert_state.expert_key.layer_id,
-                    expert_state.expert_key.expert_id,
-                    expert_state.expert_key.param_type.into(),
+                    expert_state.expert.layer_id,
+                    expert_state.expert.expert_id,
+                    crate::types::expert::RustExpertParamType::MLP1_WEIGHT,
                 );
 
                 RustExpertStatus::new(core_expert_key, tier_u8)

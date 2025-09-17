@@ -1,4 +1,4 @@
-use crate::ExpertKey;
+use crate::AbstractExpert;
 use crate::timer::TimerError;
 
 /// Error types for EWMA operations
@@ -6,7 +6,7 @@ use crate::timer::TimerError;
 pub enum EwmaError {
     InvalidAlpha(f64),
     TimerError(TimerError),
-    ExpertNotFound(ExpertKey),
+    ExpertNotFound(AbstractExpert),
 }
 
 impl std::fmt::Display for EwmaError {
@@ -16,11 +16,11 @@ impl std::fmt::Display for EwmaError {
                 write!(f, "Invalid alpha {} (must be in (0,1])", alpha)
             }
             EwmaError::TimerError(e) => write!(f, "Timer error: {}", e),
-            EwmaError::ExpertNotFound(key) => {
+            EwmaError::ExpertNotFound(expert) => {
                 write!(
                     f,
                     "Expert not found: layer={}, expert={}",
-                    key.layer_id, key.expert_id
+                    expert.layer_id, expert.expert_id
                 )
             }
         }

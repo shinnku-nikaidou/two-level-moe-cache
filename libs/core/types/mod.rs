@@ -5,6 +5,7 @@
 
 pub mod config;
 pub mod conversions;
+pub mod core_expert;
 pub mod expert;
 pub mod memory;
 pub mod model;

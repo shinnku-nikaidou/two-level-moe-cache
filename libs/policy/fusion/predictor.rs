@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 use super::config::FusionConfig;
 use super::error::FusionError;
-use crate::ExpertKey;
+use crate::AbstractExpert;
 
 /// Probability fusion predictor
 ///
@@ -58,13 +58,13 @@ impl ProbabilityFusion {
     /// * `current_layer` - Currently executing layer (0-based)
     ///
     /// # Returns
-    /// * `HashMap<ExpertKey, f64>` - Final fused probabilities p^{fuse}_{e,ℓ}(t)
+    /// * `HashMap<AbstractExpert, f64>` - Final fused probabilities p^{fuse}_{e,ℓ}(t)
     pub fn fuse_predictions(
         &self,
-        ewma_predictions: &HashMap<ExpertKey, f64>,
-        scoutgate_predictions: &HashMap<ExpertKey, f64>,
+        ewma_predictions: &HashMap<AbstractExpert, f64>,
+        scoutgate_predictions: &HashMap<AbstractExpert, f64>,
         current_layer: usize,
-    ) -> Result<HashMap<ExpertKey, f64>, FusionError> {
+    ) -> Result<HashMap<AbstractExpert, f64>, FusionError> {
         // Validate current layer
         if current_layer >= self.config.total_layers {
             return Err(FusionError::InvalidCurrentLayer {
@@ -174,12 +174,12 @@ impl ProbabilityFusion {
     /// Validate that a probability value is in [0, 1]
     fn validate_probability(
         &self,
-        expert_key: ExpertKey,
+        expert: AbstractExpert,
         probability: f64,
     ) -> Result<(), FusionError> {
         if !(0.0..=1.0).contains(&probability) {
             return Err(FusionError::InvalidProbability {
-                expert_key: format!("{:?}", expert_key),
+                expert_key: format!("{:?}", expert),
                 probability,
             });
         }
@@ -224,9 +224,9 @@ mod tests {
         let mut ewma_preds = HashMap::new();
         let mut sg_preds = HashMap::new();
 
-        let expert_key = ExpertKey::expert_level(0, 0);
-        ewma_preds.insert(expert_key, 0.8);
-        sg_preds.insert(expert_key, 0.2);
+        let expert = AbstractExpert::new(0, 0);
+        ewma_preds.insert(expert, 0.8);
+        sg_preds.insert(expert, 0.2);
 
         let result = fusion.fuse_predictions(&ewma_preds, &sg_preds, 0).unwrap();
 
@@ -234,6 +234,6 @@ mod tests {
         // Causal weight for same layer (distance=0): e^(-0.1*0) = 1.0
         // Final: 0.62 * 1.0 = 0.62
         let expected = 0.62;
-        assert!((result[&expert_key] - expected).abs() < 1e-10);
+        assert!((result[&expert] - expected).abs() < 1e-10);
     }
 }

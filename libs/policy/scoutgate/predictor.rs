@@ -11,9 +11,9 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use crate::AbstractExpert;
 use crate::constants::models::ModelConfig;
 use crate::timer::Timer;
-use crate::{ExpertKey, ExpertParamType};
 
 use super::config::ScoutGateConfig;
 use super::error::ScoutGateError;
@@ -100,8 +100,8 @@ impl ScoutGatePredictor {
     /// 3. Combine with layer embeddings
     /// 4. Use two-tower architecture to score expert
     /// 5. Apply sigmoid activation for probability output
-    pub fn get_probability(&self, _expert_key: ExpertKey) -> f64 {
-        // Placeholder: return 1.0 for any expert key as requested
+    pub fn get_probability(&self, _expert: AbstractExpert) -> f64 {
+        // Placeholder: return 1.0 for any expert as requested
         1.0
     }
 
@@ -134,14 +134,14 @@ impl ScoutGatePredictor {
     ///
     /// This corresponds to the full ScoutGate output across all layers.
     /// In full implementation, this would be the main prediction method.
-    pub fn get_all_probabilities(&self) -> HashMap<ExpertKey, f64> {
+    pub fn get_all_probabilities(&self) -> HashMap<AbstractExpert, f64> {
         let mut all_probs = HashMap::new();
 
-        // Generate predictions for all expert-layer pairs (using expert_level for simplicity)
+        // Generate predictions for all expert-layer pairs
         for layer_id in 0..self.model_config.total_layers {
             for expert_id in 0..self.model_config.experts_per_layer {
-                let expert_key = ExpertKey::expert_level(expert_id, layer_id);
-                all_probs.insert(expert_key, 1.0);
+                let expert = AbstractExpert::new(expert_id, layer_id);
+                all_probs.insert(expert, 1.0);
             }
         }
 
