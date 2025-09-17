@@ -26,7 +26,3 @@
 pub mod algorithm;
 pub mod config;
 pub mod error;
-
-pub use algorithm::{CacheDecision, ExpertState, MemoryTier, WatermarkAlgorithm};
-pub use config::{WatermarkConfig, WatermarkConfigError};
-pub use error::WatermarkError;

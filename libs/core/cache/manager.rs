@@ -8,7 +8,7 @@ use policy::{
     constants::{ModelConfig, ModelType},
     fusion::ProbabilityFusion,
     timer::Timer,
-    watermark::WatermarkAlgorithm,
+    watermark::algorithm::WatermarkAlgorithm,
 };
 use pyo3::prelude::*;
 /// Thin Python interface for the two-level MOE cache system

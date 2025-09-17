@@ -3,7 +3,7 @@
 //! This module defines the MemoryTier enumeration that represents different
 //! storage tiers in the two-level cache hierarchy.
 
-use policy::watermark::MemoryTier;
+use policy::watermark::algorithm::MemoryTier;
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 

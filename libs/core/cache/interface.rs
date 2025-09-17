@@ -5,7 +5,7 @@
 
 use super::manager::RustTwoTireWmExpertCacheManager;
 use crate::types::{expert::RustExpertKey, model::RustModelType, status::RustExpertStatus};
-use policy::watermark::MemoryTier;
+use policy::watermark::algorithm::MemoryTier;
 use pyo3::prelude::*;
 
 #[pymethods]
@@ -46,8 +46,8 @@ impl RustTwoTireWmExpertCacheManager {
         self.watermark_algorithm
             .expert_states()
             .iter()
-            .flat_map(|(expert, expert_state)| {
-                let tier_u8 = match expert_state.current_tier {
+            .flat_map(|(expert, memory_tier)| {
+                let tier_u8 = match memory_tier {
                     MemoryTier::Vram => 0,
                     MemoryTier::Ram => 1,
                     MemoryTier::Disk => 2,
