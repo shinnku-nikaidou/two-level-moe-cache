@@ -11,7 +11,7 @@
 use std::collections::HashMap;
 
 use crate::AbstractExpert;
-use crate::constants::ModelConfig;
+use crate::constants::{ModelConfig, ModelType};
 use crate::timer::Timer;
 
 use super::config::ScoutGateConfig;
@@ -60,22 +60,11 @@ impl<'a> ScoutGatePredictor<'a> {
         })
     }
 
-    /// Create ScoutGate predictor for GPT-OSS-20B model
-    pub fn for_gptoss20b(timer: &'a Timer) -> Result<Self, ScoutGateError> {
-        use crate::constants::GPT_OSS_20B;
-        Self::new(timer, GPT_OSS_20B.clone(), ScoutGateConfig::default())
-    }
-
-    /// Create ScoutGate predictor for GPT-OSS-120B model
-    pub fn for_gptoss120b(timer: &'a Timer) -> Result<Self, ScoutGateError> {
-        use crate::constants::GPT_OSS_120B;
-        Self::new(timer, GPT_OSS_120B.clone(), ScoutGateConfig::default())
-    }
-
-    /// Create ScoutGate predictor for Phi-Tiny-MoE model (for testing)
-    pub fn for_phi_tiny_moe(timer: &'a Timer) -> Result<Self, ScoutGateError> {
-        use crate::constants::PHI_TINY_MOE;
-        Self::new(timer, PHI_TINY_MOE.clone(), ScoutGateConfig::default())
+    /// Create ScoutGate predictor from model type
+    pub fn from_model(timer: &'a Timer, model_type: ModelType) -> Self {
+        let config: ModelConfig = model_type.into();
+        Self::new(timer, config, ScoutGateConfig::default())
+            .expect("Default ScoutGate configuration should be valid")
     }
 
     /// Update token context with new token

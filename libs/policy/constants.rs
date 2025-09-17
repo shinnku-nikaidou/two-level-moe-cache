@@ -10,6 +10,24 @@ pub struct ModelConfig {
     pub experts_per_layer: usize,
 }
 
+/// Python-compatible model type
+#[derive(Debug, Clone)]
+pub enum ModelType {
+    GptOss20B,
+    GptOss120B,
+    PhiTinyMoe,
+}
+
+impl From<ModelType> for ModelConfig {
+    fn from(model_type: ModelType) -> Self {
+        match model_type {
+            ModelType::GptOss20B => GPT_OSS_20B,
+            ModelType::GptOss120B => GPT_OSS_120B,
+            ModelType::PhiTinyMoe => PHI_TINY_MOE,
+        }
+    }
+}
+
 // GPT-OSS model series configurations
 pub const GPT_OSS_20B: ModelConfig = ModelConfig {
     name: "gpt-oss-20b",

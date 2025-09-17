@@ -6,6 +6,36 @@ pub mod scoutgate;
 pub mod timer;
 pub mod watermark;
 
+pub type Probability = Option<f64>; // Probability values in [0.0, 1.0]
+
+// Probability map per expert per layer
+pub struct ExpertProbability {
+    inner: Vec<Vec<Probability>>,
+}
+
+impl ExpertProbability {
+    /// Create a new ExpertProbability with given dimensions
+    pub fn new(num_layers: usize, num_experts: usize) -> Self {
+        let inner = vec![vec![None; num_experts]; num_layers];
+        Self { inner }
+    }
+
+    /// Create ExpertProbability from model type
+    pub fn from_model(model_type: constants::ModelType) -> Self {
+        let config: constants::ModelConfig = model_type.into();
+        Self::new(config.total_layers, config.experts_per_layer)
+    }
+
+    /// Get probability for specific expert-layer pair
+    pub fn get(&self, layer_id: usize, expert_id: usize) -> Probability {
+        if layer_id < self.inner.len() && expert_id < self.inner[layer_id].len() {
+            self.inner[layer_id][expert_id]
+        } else {
+            None
+        }
+    }
+}
+
 /// Abstract expert identifier for policy-level operations
 /// Unlike ExpertKey, this doesn't include parameter types - policy layer
 /// only cares about expert-level decisions, not individual parameters

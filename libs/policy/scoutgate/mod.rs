@@ -34,7 +34,7 @@
 //!
 //! // Create timer and predictor
 //! let timer = Timer::new(24); // 24 layers for GPT-OSS-20B
-//! let mut predictor = ScoutGatePredictor::for_gptoss20b(&timer)?;
+//! let mut predictor = ScoutGatePredictor::from_model(&timer, ModelType::GptOss20B);
 //!
 //! // Update with new token (placeholder)
 //! predictor.update_token_context(123)?;
