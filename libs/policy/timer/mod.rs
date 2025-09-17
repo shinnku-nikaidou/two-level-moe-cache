@@ -25,7 +25,7 @@ impl Timer {
     /// * `config` - Model configuration containing layer information
     pub fn from_model(config: &crate::constants::ModelConfig) -> Self {
         use crate::constants::{GPT_OSS_20B, GPT_OSS_120B, PHI_TINY_MOE};
-        
+
         match config.name {
             "gpt-oss-20b" => Timer {
                 current_time: 0,
@@ -53,7 +53,7 @@ impl Timer {
     /// Formula: v_ℓ(t) = ⌊t/L⌋ + (1 if t%L >= ℓ else 0)
     pub fn layer_visit_count(&self, layer: usize) -> u64 {
         assert!(layer < self.total_layers, "Layer index out of bounds");
-        
+
         let full_cycles = self.current_time / (self.total_layers as u64);
         let current_position = (self.current_time % (self.total_layers as u64)) as usize;
         let extra = if current_position >= layer { 1 } else { 0 };

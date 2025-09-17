@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::rc::Rc;
 
 use crate::AbstractExpert;
 use crate::constants::ModelConfig;
@@ -13,9 +12,9 @@ use super::error::EwmaError;
 /// Implements the layer-local EWMA algorithm from the documentation using 0-based indexing.
 /// Maintains activation probability estimates for each expert-layer pair using exponential
 /// weighted moving averages with a shared Timer for layer-local clock management.
-pub struct EwmaPredictor {
+pub struct EwmaPredictor<'a> {
     /// Shared timer for layer-local time management
-    timer: Rc<Timer>,
+    timer: &'a Timer,
 
     /// EWMA smoothing parameter α ∈ (0,1]
     alpha: f64,
@@ -28,10 +27,10 @@ pub struct EwmaPredictor {
     ewma_values: HashMap<AbstractExpert, f64>,
 }
 
-impl EwmaPredictor {
+impl<'a> EwmaPredictor<'a> {
     /// Create a new EWMA predictor with shared timer
     pub fn new(
-        timer: Rc<Timer>,
+        timer: &'a Timer,
         config: ModelConfig,
         ewma_config: EwmaConfig,
     ) -> Result<Self, EwmaError> {
@@ -47,19 +46,19 @@ impl EwmaPredictor {
     }
 
     /// Create EWMA predictor for GPT-OSS-20B model
-    pub fn for_gptoss20b(timer: Rc<Timer>) -> Result<Self, EwmaError> {
+    pub fn for_gptoss20b(timer: &'a Timer) -> Result<Self, EwmaError> {
         use crate::constants::GPT_OSS_20B;
         Self::new(timer, GPT_OSS_20B.clone(), EwmaConfig::default())
     }
 
     /// Create EWMA predictor for GPT-OSS-120B model  
-    pub fn for_gptoss120b(timer: Rc<Timer>) -> Result<Self, EwmaError> {
+    pub fn for_gptoss120b(timer: &'a Timer) -> Result<Self, EwmaError> {
         use crate::constants::GPT_OSS_120B;
         Self::new(timer, GPT_OSS_120B.clone(), EwmaConfig::default())
     }
 
     /// Create EWMA predictor for Phi-Tiny-MoE model (for testing)
-    pub fn for_phi_tiny_moe(timer: Rc<Timer>) -> Result<Self, EwmaError> {
+    pub fn for_phi_tiny_moe(timer: &'a Timer) -> Result<Self, EwmaError> {
         use crate::constants::PHI_TINY_MOE;
         Self::new(timer, PHI_TINY_MOE.clone(), EwmaConfig::default())
     }

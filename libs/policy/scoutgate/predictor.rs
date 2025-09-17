@@ -9,7 +9,6 @@
 //! would include token embedding, projection layers, two-tower architecture, etc.
 
 use std::collections::HashMap;
-use std::rc::Rc;
 
 use crate::AbstractExpert;
 use crate::constants::ModelConfig;
@@ -28,9 +27,9 @@ use super::error::ScoutGateError;
 /// - Two-tower architecture for expert scoring
 /// - Context processing with recent m tokens
 /// - Sigmoid activation for probability outputs
-pub struct ScoutGatePredictor {
+pub struct ScoutGatePredictor<'a> {
     /// Shared timer for time step management (though ScoutGate provides global predictions)
-    timer: Rc<Timer>,
+    timer: &'a Timer,
 
     /// ScoutGate configuration parameters
     config: ScoutGateConfig,
@@ -43,10 +42,10 @@ pub struct ScoutGatePredictor {
     _token_context: Vec<u32>,
 }
 
-impl ScoutGatePredictor {
+impl<'a> ScoutGatePredictor<'a> {
     /// Create a new ScoutGate predictor with shared timer
     pub fn new(
-        timer: Rc<Timer>,
+        timer: &'a Timer,
         model_config: ModelConfig,
         config: ScoutGateConfig,
     ) -> Result<Self, ScoutGateError> {
@@ -62,19 +61,19 @@ impl ScoutGatePredictor {
     }
 
     /// Create ScoutGate predictor for GPT-OSS-20B model
-    pub fn for_gptoss20b(timer: Rc<Timer>) -> Result<Self, ScoutGateError> {
+    pub fn for_gptoss20b(timer: &'a Timer) -> Result<Self, ScoutGateError> {
         use crate::constants::GPT_OSS_20B;
         Self::new(timer, GPT_OSS_20B.clone(), ScoutGateConfig::default())
     }
 
     /// Create ScoutGate predictor for GPT-OSS-120B model
-    pub fn for_gptoss120b(timer: Rc<Timer>) -> Result<Self, ScoutGateError> {
+    pub fn for_gptoss120b(timer: &'a Timer) -> Result<Self, ScoutGateError> {
         use crate::constants::GPT_OSS_120B;
         Self::new(timer, GPT_OSS_120B.clone(), ScoutGateConfig::default())
     }
 
     /// Create ScoutGate predictor for Phi-Tiny-MoE model (for testing)
-    pub fn for_phi_tiny_moe(timer: Rc<Timer>) -> Result<Self, ScoutGateError> {
+    pub fn for_phi_tiny_moe(timer: &'a Timer) -> Result<Self, ScoutGateError> {
         use crate::constants::PHI_TINY_MOE;
         Self::new(timer, PHI_TINY_MOE.clone(), ScoutGateConfig::default())
     }

@@ -31,11 +31,10 @@
 //! ```rust
 //! use policy::scoutgate::{ScoutGatePredictor, ScoutGateConfig};
 //! use policy::timer::Timer;
-//! use std::rc::Rc;
 //!
 //! // Create timer and predictor
-//! let timer = Rc::new(Timer::new());
-//! let mut predictor = ScoutGatePredictor::for_gptoss20b(timer)?;
+//! let timer = Timer::new(24); // 24 layers for GPT-OSS-20B
+//! let mut predictor = ScoutGatePredictor::for_gptoss20b(&timer)?;
 //!
 //! // Update with new token (placeholder)
 //! predictor.update_token_context(123)?;
