@@ -1,4 +1,5 @@
 // Policy library module
+
 pub mod constants;
 pub mod ewma;
 pub mod fusion;
@@ -32,6 +33,13 @@ impl ExpertProbability {
             self.inner[layer_id][expert_id]
         } else {
             None
+        }
+    }
+
+    /// Set probability for specific expert-layer pair
+    pub fn set(&mut self, layer_id: usize, expert_id: usize, probability: f64) {
+        if layer_id < self.inner.len() && expert_id < self.inner[layer_id].len() {
+            self.inner[layer_id][expert_id] = Some(probability);
         }
     }
 }

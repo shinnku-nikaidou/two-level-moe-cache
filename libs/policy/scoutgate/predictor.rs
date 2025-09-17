@@ -8,11 +8,10 @@
 //! This is a placeholder that returns 1.0 for any expert key. The full implementation
 //! would include token embedding, projection layers, two-tower architecture, etc.
 
-use std::collections::HashMap;
-
 use crate::AbstractExpert;
 use crate::constants::{ModelConfig, ModelType};
 use crate::timer::Timer;
+use crate::{ExpertProbability, Probability};
 
 use super::config::ScoutGateConfig;
 use super::error::ScoutGateError;
@@ -37,6 +36,9 @@ pub struct ScoutGatePredictor<'a> {
     /// Model configuration (layers, experts per layer, etc.)
     model_config: ModelConfig,
 
+    /// Current prediction values for all expert-layer pairs
+    predictions: ExpertProbability,
+
     /// Placeholder for current token context
     /// In full implementation, this would store recent m tokens
     _token_context: Vec<u32>,
@@ -44,27 +46,26 @@ pub struct ScoutGatePredictor<'a> {
 
 impl<'a> ScoutGatePredictor<'a> {
     /// Create a new ScoutGate predictor with shared timer
-    pub fn new(
-        timer: &'a Timer,
-        model_config: ModelConfig,
-        config: ScoutGateConfig,
-    ) -> Result<Self, ScoutGateError> {
-        // Validate configuration
-        config.validate()?;
+    pub fn new(timer: &'a Timer, model_config: ModelConfig, config: ScoutGateConfig) -> Self {
+        // Validate configuration - panic on failure
+        config.validate().expect("Invalid ScoutGate configuration");
 
-        Ok(ScoutGatePredictor {
+        let predictions =
+            ExpertProbability::new(model_config.total_layers, model_config.experts_per_layer);
+
+        ScoutGatePredictor {
             timer,
             config,
             model_config,
+            predictions,
             _token_context: Vec::new(),
-        })
+        }
     }
 
     /// Create ScoutGate predictor from model type
     pub fn from_model(timer: &'a Timer, model_type: ModelType) -> Self {
-        let config: ModelConfig = model_type.into();
-        Self::new(timer, config, ScoutGateConfig::default())
-            .expect("Default ScoutGate configuration should be valid")
+        let model_config: ModelConfig = model_type.into();
+        Self::new(timer, model_config, ScoutGateConfig::default())
     }
 
     /// Update token context with new token
@@ -88,9 +89,11 @@ impl<'a> ScoutGatePredictor<'a> {
     /// 3. Combine with layer embeddings
     /// 4. Use two-tower architecture to score expert
     /// 5. Apply sigmoid activation for probability output
-    pub fn get_probability(&self, _expert: AbstractExpert) -> f64 {
-        // Placeholder: return 1.0 for any expert as requested
-        1.0
+    pub fn get_probability(&self, expert: AbstractExpert) -> f64 {
+        // Get from predictions storage, or return 1.0 if not set
+        self.predictions
+            .get(expert.layer_id, expert.expert_id)
+            .unwrap_or(1.0)
     }
 
     /// Get activation probability predictions for all experts in a specific layer
@@ -99,18 +102,18 @@ impl<'a> ScoutGatePredictor<'a> {
     ///
     /// This is the main interface that should output ŵp^{SG}_{e,ℓ}(t) ∈ [0,1]
     /// for all experts e in layer ℓ at time t.
-    pub fn get_layer_probabilities(&self, layer_id: usize) -> HashMap<usize, f64> {
-        let mut layer_probs = HashMap::new();
-
+    pub fn get_layer_probabilities(&self, layer_id: usize) -> Vec<Probability> {
         // Validate layer_id
         if layer_id >= self.model_config.total_layers {
-            // Return empty map for invalid layer
-            return layer_probs;
+            // Return empty vector for invalid layer
+            return Vec::new();
         }
 
-        // Generate placeholder probabilities (1.0) for all experts in the layer
+        // Generate probabilities for all experts in the layer
+        let mut layer_probs = Vec::with_capacity(self.model_config.experts_per_layer);
         for expert_id in 0..self.model_config.experts_per_layer {
-            layer_probs.insert(expert_id, 1.0);
+            let prob = self.predictions.get(layer_id, expert_id);
+            layer_probs.push(prob);
         }
 
         layer_probs
@@ -118,22 +121,18 @@ impl<'a> ScoutGatePredictor<'a> {
 
     /// Get activation probability predictions for all layers and experts
     ///
-    /// **PLACEHOLDER**: Returns 1.0 for all expert-layer pairs
+    /// **PLACEHOLDER**: Returns stored predictions
     ///
     /// This corresponds to the full ScoutGate output across all layers.
     /// In full implementation, this would be the main prediction method.
-    pub fn get_all_probabilities(&self) -> HashMap<AbstractExpert, f64> {
-        let mut all_probs = HashMap::new();
+    pub fn get_all_probabilities(&self) -> &ExpertProbability {
+        &self.predictions
+    }
 
-        // Generate predictions for all expert-layer pairs
-        for layer_id in 0..self.model_config.total_layers {
-            for expert_id in 0..self.model_config.experts_per_layer {
-                let expert = AbstractExpert::new(expert_id, layer_id);
-                all_probs.insert(expert, 1.0);
-            }
-        }
-
-        all_probs
+    /// Update prediction for a specific expert-layer pair
+    pub fn update_probability(&mut self, expert: AbstractExpert, probability: f64) {
+        self.predictions
+            .set(expert.layer_id, expert.expert_id, probability);
     }
 
     /// Force prediction update/refresh

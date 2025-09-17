@@ -12,41 +12,16 @@
 //! 1. **Benefit Density Calculation**: For each expert with fused probability p^{fuse}:
 //!    - VRAM benefit: `b^G = p^{fuse} * C^G / S`
 //!    - RAM benefit: `b^R = p^{fuse} * C^R / S`
-//!    where C^G, C^R are tier access costs and S is expert size
+//!      where C^G, C^R are tier access costs and S is expert size
 //!
 //! 2. **Watermark Updates**: Using subgradient method:
 //!    - `λ_G ← [λ_G + η_G(vram_usage - K_G)]_+`
 //!    - `λ_R ← [λ_R + η_R(ram_usage - K_R)]_+`
-//!    where K_G, K_R are tier capacities and η_G, η_R are learning rates
+//!      where K_G, K_R are tier capacities and η_G, η_R are learning rates
 //!
 //! 3. **Cache Decisions**: For each expert:
 //!    - Keep in tier if `benefit >= watermark`
 //!    - Evict from tier if `benefit < watermark`
-//!
-//! ## Usage Example
-//!
-//! ```rust
-//! use policy::watermark::{WatermarkAlgorithm, WatermarkConfig};
-//! use policy::ExpertKey;
-//! use std::collections::HashMap;
-//!
-//! // Create algorithm instance
-//! let mut algorithm = WatermarkAlgorithm::for_gptoss20b(512, 2048);
-//!
-//! // Prepare fused probabilities
-//! let mut fused_probs = HashMap::new();
-//! let expert_key = ExpertKey::new(0, 1);
-//! fused_probs.insert(expert_key, 0.7);
-//!
-//! // Make cache decisions
-//! let decisions = algorithm.make_cache_decisions(&fused_probs)?;
-//!
-//! // Apply decisions and advance time
-//! for (key, decision) in decisions {
-//!     algorithm.apply_decision(key, decision)?;
-//! }
-//! algorithm.step();
-//! ```
 
 pub mod algorithm;
 pub mod config;
