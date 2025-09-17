@@ -5,7 +5,6 @@
 
 pub mod interface;
 pub mod manager;
-pub mod mock;
 
 // Re-export main cache manager
 pub use manager::TwoTireWmExpertCacheManager;

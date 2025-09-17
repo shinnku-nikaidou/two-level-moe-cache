@@ -3,9 +3,11 @@
 //! This module defines the main TwoTireWmExpertCacheManager struct and its
 //! core data structures, serving as a thin Python interface layer.
 
-use policy::ExpertKey as PolicyExpertKey;
+use policy::{
+    fusion::{FusionConfig, ProbabilityFusion},
+    watermark::WatermarkAlgorithm,
+};
 use pyo3::prelude::*;
-use std::collections::HashMap;
 
 use crate::types::ModelType;
 
@@ -24,8 +26,11 @@ pub struct TwoTireWmExpertCacheManager {
     /// Total layers in model
     pub(crate) total_layers: usize,
 
-    /// Mock state for demonstration - real implementation would delegate everything to policy layer
-    pub(crate) mock_ewma_probs: HashMap<PolicyExpertKey, f64>,
+    /// Probability fusion component
+    pub(crate) fusion: ProbabilityFusion,
+
+    /// Watermark algorithm for cache decisions
+    pub(crate) watermark_algorithm: WatermarkAlgorithm,
 }
 
 impl TwoTireWmExpertCacheManager {
@@ -33,33 +38,28 @@ impl TwoTireWmExpertCacheManager {
     pub fn new(
         _model_type: ModelType,
         total_layers: usize,
-        _vram_capacity: usize,
-        _ram_capacity: usize,
+        vram_capacity: usize,
+        ram_capacity: usize,
     ) -> Result<Self, String> {
         if total_layers == 0 {
             return Err("total_layers must be > 0".to_string());
         }
 
+        // Create probability fusion
+        let fusion_config = FusionConfig::for_gptoss20b();
+        let fusion = ProbabilityFusion::new(fusion_config)
+            .map_err(|e| format!("Failed to create probability fusion: {}", e))?;
+
+        // Create watermark algorithm
+        let watermark_algorithm = WatermarkAlgorithm::for_gptoss20b(vram_capacity, ram_capacity)
+            .map_err(|e| format!("Failed to create watermark algorithm: {}", e))?;
+
         Ok(Self {
             current_time: 0,
             current_layer: 0,
             total_layers,
-            mock_ewma_probs: HashMap::new(),
+            fusion,
+            watermark_algorithm,
         })
-    }
-
-    /// Get current time
-    pub fn current_time(&self) -> u64 {
-        self.current_time
-    }
-
-    /// Get current layer
-    pub fn current_layer(&self) -> usize {
-        self.current_layer
-    }
-
-    /// Get total layers
-    pub fn total_layers(&self) -> usize {
-        self.total_layers
     }
 }
