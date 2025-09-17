@@ -8,10 +8,10 @@ for watermark-based expert caching with dual-tier memory management.
 from typing import List
 from ..cache.interfaces.expert_cache import IExpertCacheManager
 from ..cache.entities.expert import Expert
-from src.common.types import ExpertKey, MemoryTier
+from src.common.types import ExpertKey, MemoryTier, ExpertParamType
 from .. import ModelType
 from .utils import rust_model_type
-from rust_core import RustTwoTireWmExpertCacheManager
+from rust_core import RustExpertKey, RustTwoTireWmExpertCacheManager
 
 
 class TwoTireWmExpertCacheManager(IExpertCacheManager):
@@ -100,19 +100,21 @@ class TwoTireWmExpertCacheManager(IExpertCacheManager):
         rust_experts_status = self._rust_cache.experts_status()
 
         # Sync Rust-side states to Expert instances in self._experts
-        for expert_status in rust_experts_status:
-            expert_key = expert_status.expert_key
-            rust_tier = MemoryTier(expert_status.current_tier)
+        for rust_expert_status in rust_experts_status:
+            rust_expert_key = rust_expert_status.expert_key
 
-            # Get the corresponding Expert instance
-            if expert_key in self._experts:
-                expert = self._experts[expert_key]
+            # Convert to Python key
+            expert_key = ExpertKey(
+                layer_idx=rust_expert_key.layer_idx,
+                expert_id=rust_expert_key.expert_id,
+                param_type=ExpertParamType(rust_expert_key.param_type.name),
+            )
 
-                # Adjust Expert instance memory tier based on Rust-side state
-                current_python_tier = expert.current_tier
+            # Get the corresponding Expert instance and sync
+            expert = self._experts[expert_key]
+            target_tier = MemoryTier(rust_expert_status.current_tier)
 
-                if current_python_tier != rust_tier:
-                    self._sync_expert_tier(expert, rust_tier)
+            self._sync_expert_tier(expert, target_tier)
 
     def _sync_expert_tier(self, expert: Expert, target_tier: MemoryTier) -> None:
         """
