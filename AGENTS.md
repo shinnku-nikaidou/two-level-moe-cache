@@ -38,6 +38,41 @@ make
 
 **Important**: The `.pyi` file provides Python type hints for Rust-exported functions and classes. Keep it synchronized with your Rust code changes to maintain proper IDE support and type checking.
 
+## Testing Guidelines
+
+### 📁 Temporary Test Files
+
+**When creating temporary test files for debugging or validation, always place them in the `tmp/` directory:**
+
+```bash
+# ✅ Correct - put temporary test files in tmp/
+tmp/test_experts_status.py
+tmp/debug_model_type.py
+tmp/test_cleanup.py
+
+# ❌ Wrong - don't clutter root directory
+test_experts_status.py
+debug_model_type.py
+```
+
+**Guidelines:**
+
+- **Use `tmp/` for ephemeral test files** that are created during development and debugging
+- **Use `tests/` for permanent test files** that are part of the test suite
+- **Clean up `tmp/` regularly** - these files are meant to be temporary
+- **Add `tmp/` to `.gitignore`** if it's not already there to avoid committing temporary files
+
+### 🧪 Running Temporary Tests
+
+```bash
+# Always activate environment first
+source .venv/bin/activate
+
+# Run temporary tests from project root
+python tmp/test_cleanup.py
+python tmp/debug_model_type.py
+```
+
 ## Model Checkpoint Structure
 
 ### Important: Model Location
