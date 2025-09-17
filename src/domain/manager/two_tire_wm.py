@@ -11,7 +11,7 @@ from ..cache.entities.expert import Expert
 from src.common.types import ExpertKey, MemoryTier, ExpertParamType
 from .. import ModelType
 from .utils import rust_model_type
-from rust_core import RustExpertKey, RustTwoTireWmExpertCacheManager
+from rust_core import RustTwoTireWmExpertCacheManager
 
 
 class TwoTireWmExpertCacheManager(IExpertCacheManager):
@@ -45,7 +45,8 @@ class TwoTireWmExpertCacheManager(IExpertCacheManager):
         """
         super().__init__(model_type)
 
-        self.layer_idx_now = 0
+        # Initialize to -1 to ensure first layer (layer 0) triggers activation update
+        self.layer_idx_now = -1
 
         # Initialize Rust implementation (simplified interface)
         # Note: Using positional args to match Rust #[new] signature:
@@ -79,12 +80,17 @@ class TwoTireWmExpertCacheManager(IExpertCacheManager):
             key.param_type == first_param_type for key in keys
         ), f"All keys must have the same ExpertParamType, but got types: {[key.param_type for key in keys]}"
 
+        # Layer transition detection: Each layer has 4 parameter types (MLP1_WEIGHT, MLP1_BIAS, MLP2_WEIGHT, MLP2_BIAS)
+        # so get_batch() is called 4 times per layer. We must only update activations and sync cache state
+        # ONCE per layer to avoid:
+        # 1. Incorrect EWMA statistics accumulation (4x the actual activation count)
+        # 2. Wrong layer-local time advancement (4 steps instead of 1)
+        # 3. Erroneous watermark threshold calculations
+        # This check ensures watermark algorithm correctness by preventing repeated updates within the same layer.
         if first_layer != self.layer_idx_now:
             self.layer_idx_now = first_layer
             self.update_activations([key.expert_id for key in keys])
-
-        # 
-        self.sync_back()
+            self.sync_back()
 
         experts = []
         for key in keys:

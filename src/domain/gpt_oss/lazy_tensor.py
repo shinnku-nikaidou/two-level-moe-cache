@@ -78,7 +78,7 @@ class LazyExpertTensor:
         experts = self.expert_cache_manager.get_batch(expert_keys)
 
         # Direct result construction with null check
-        expert_tensors = []
+        expert_tensors: List[torch.Tensor] = []
         for expert in experts:
             if expert.data_vram is None:
                 raise RuntimeError(f"Expert data is None after loading")
