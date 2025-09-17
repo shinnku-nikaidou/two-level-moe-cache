@@ -45,7 +45,7 @@ class TwoTireWmExpertCacheManager(IExpertCacheManager):
         """
         super().__init__(model_type)
 
-        self.layer_idx = 0
+        self.layer_idx_now = 0
 
         # Initialize Rust implementation (simplified interface)
         # Note: Using positional args to match Rust #[new] signature:
@@ -80,8 +80,8 @@ class TwoTireWmExpertCacheManager(IExpertCacheManager):
             key.param_type == first_param_type for key in keys
         ), f"All keys must have the same ExpertParamType, but got types: {[key.param_type for key in keys]}"
 
-        if first_layer != self.layer_idx:
-            self.layer_idx = first_layer
+        if first_layer != self.layer_idx_now:
+            self.layer_idx_now = first_layer
             self.update_activations([key.expert_id for key in keys])
 
         experts = []

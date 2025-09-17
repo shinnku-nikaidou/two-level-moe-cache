@@ -5,6 +5,3 @@
 
 pub mod interface;
 pub mod manager;
-
-// Re-export main cache manager
-pub use manager::TwoTireWmExpertCacheManager;

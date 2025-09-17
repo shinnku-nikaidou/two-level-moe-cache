@@ -3,21 +3,19 @@
 //! This module contains all PyO3 methods and Python-facing interfaces
 //! for the TwoTireWmExpertCacheManager.
 
-use pyo3::prelude::*;
-
 use super::manager::TwoTireWmExpertCacheManager;
-use crate::types::{ExpertKey, ModelType};
+use crate::types::{expert::ExpertKey, model::ModelType};
+use pyo3::prelude::*;
 
 #[pymethods]
 impl TwoTireWmExpertCacheManager {
     #[new]
     pub fn py_new(
         model_type: ModelType,
-        total_layers: usize,
         vram_capacity: usize,
         ram_capacity: usize,
     ) -> PyResult<Self> {
-        Self::new(model_type, total_layers, vram_capacity, ram_capacity)
+        Self::new(model_type, vram_capacity, ram_capacity)
             .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)
     }
 
@@ -26,7 +24,7 @@ impl TwoTireWmExpertCacheManager {
         // For now, we don't have EWMA/ScoutGate predictions to work with
         // This method would need to be redesigned once we integrate those components
         // Current implementation is a placeholder that compiles
-        Ok(())
+        panic!("No need to implement get() here;");
     }
 
     /// Update with new layer activations - placeholder for integration with EWMA/ScoutGate
@@ -39,11 +37,9 @@ impl TwoTireWmExpertCacheManager {
     /// Advance to next time step
     pub fn step_forward(&mut self) -> PyResult<()> {
         self.current_time += 1;
-        self.current_layer = (self.current_layer + 1) % self.total_layers;
-        
         // Step the watermark algorithm
         self.watermark_algorithm.step();
-        
+
         Ok(())
     }
 
@@ -54,12 +50,12 @@ impl TwoTireWmExpertCacheManager {
 
     /// Get current layer
     pub fn current_layer(&self) -> usize {
-        self.current_layer
+        todo!()
     }
 
     /// Get total layers
     pub fn total_layers(&self) -> usize {
-        self.total_layers
+        todo!()
     }
 
     /// Get watermark values for debugging

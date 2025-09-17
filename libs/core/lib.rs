@@ -15,11 +15,11 @@ pub mod utils;
 #[pyo3(name = "rust_core")]
 pub fn core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // New two-tier watermark cache types
-    m.add_class::<types::MemoryTier>()?;
-    m.add_class::<types::ExpertKey>()?;
-    m.add_class::<types::WatermarkConfig>()?;
-    m.add_class::<types::ExpertParamType>()?;
-    m.add_class::<cache::TwoTireWmExpertCacheManager>()?;
+    m.add_class::<types::memory::MemoryTier>()?;
+    m.add_class::<types::expert::ExpertKey>()?;
+    m.add_class::<types::config::WatermarkConfig>()?;
+    m.add_class::<types::expert::ExpertParamType>()?;
+    m.add_class::<cache::manager::TwoTireWmExpertCacheManager>()?;
 
     Ok(())
 }
