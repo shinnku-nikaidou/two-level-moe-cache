@@ -7,10 +7,7 @@
 //! 3. Forward-causal weights: W(ℓ|ℓ(t)) := e^{-γ·D(ℓ|ℓ(t))}
 //! 4. Final fusion: p^{fuse}_{e,ℓ}(t) := p^{base}_{e,ℓ}(t) · W(ℓ|ℓ(t))
 
-use std::collections::HashMap;
-
 use super::error::FusionError;
-use crate::AbstractExpert;
 
 /// Probability fusion predictor
 ///
@@ -39,22 +36,10 @@ impl ProbabilityFusion {
         }
     }
 
-    /// Create fusion predictor for GPT-OSS-20B model
-    pub fn for_gptoss20b() -> Self {
-        use crate::constants::GPT_OSS_20B;
-        Self::new(0.5, 0.1, GPT_OSS_20B.total_layers)
-    }
-
-    /// Create fusion predictor for GPT-OSS-120B model
-    pub fn for_gptoss120b() -> Self {
-        use crate::constants::GPT_OSS_120B;
-        Self::new(0.5, 0.1, GPT_OSS_120B.total_layers)
-    }
-
-    /// Create fusion predictor for Phi-Tiny-MoE model (for testing)
-    pub fn for_phi_tiny_moe() -> Self {
-        use crate::constants::PHI_TINY_MOE;
-        Self::new(0.5, 0.1, PHI_TINY_MOE.total_layers)
+    /// Create fusion predictor from model type
+    pub fn from_model(model_type: crate::constants::ModelType) -> Self {
+        let config: crate::constants::ModelConfig = model_type.into();
+        Self::new(0.5, 0.1, config.total_layers)
     }
 
     /// Fuse EWMA and ScoutGate predictions with forward-causal weights
@@ -65,18 +50,18 @@ impl ProbabilityFusion {
     /// 3. Final fused probabilities output
     ///
     /// # Arguments
-    /// * `ewma_predictions` - EWMA probability predictions for experts
-    /// * `scoutgate_predictions` - ScoutGate probability predictions for experts
+    /// * `ewma_predictions` - EWMA probability predictions using ExpertProbability
+    /// * `scoutgate_predictions` - ScoutGate probability predictions using ExpertProbability
     /// * `current_layer` - Currently executing layer (0-based)
     ///
     /// # Returns
-    /// * `HashMap<AbstractExpert, f64>` - Final fused probabilities p^{fuse}_{e,ℓ}(t)
-    pub fn fuse_predictions(
+    /// * `crate::ExpertProbability` - Final fused probabilities p^{fuse}_{e,ℓ}(t)
+    pub fn fuse(
         &self,
-        ewma_predictions: &HashMap<AbstractExpert, f64>,
-        scoutgate_predictions: &HashMap<AbstractExpert, f64>,
+        ewma_predictions: &crate::ExpertProbability,
+        scoutgate_predictions: &crate::ExpertProbability,
         current_layer: usize,
-    ) -> Result<HashMap<AbstractExpert, f64>, FusionError> {
+    ) -> Result<crate::ExpertProbability, FusionError> {
         // Validate current layer
         if current_layer >= self.total_layers {
             return Err(FusionError::InvalidCurrentLayer {
@@ -85,43 +70,46 @@ impl ProbabilityFusion {
             });
         }
 
-        // Get all expert keys from both prediction maps
-        let all_keys: std::collections::HashSet<_> = ewma_predictions
-            .keys()
-            .chain(scoutgate_predictions.keys())
-            .collect();
+        // Create output ExpertProbability with same dimensions as inputs
+        // Assume all Vec<Vec<T>> structures have identical dimensions
+        let mut result = crate::ExpertProbability::new(
+            ewma_predictions.inner.len(),
+            ewma_predictions.inner[0].len(),
+        );
 
-        let mut fused_predictions = HashMap::new();
+        // Process each layer and expert pair
+        for (layer_id, (ewma_layer, scoutgate_layer)) in ewma_predictions
+            .inner
+            .iter()
+            .zip(scoutgate_predictions.inner.iter())
+            .enumerate()
+        {
+            for (expert_id, (ewma_prob_opt, scoutgate_prob_opt)) in
+                ewma_layer.iter().zip(scoutgate_layer.iter()).enumerate()
+            {
+                // Extract probability values, default to 0.0 if None
+                let ewma_prob = ewma_prob_opt.unwrap_or(0.0);
+                let scoutgate_prob = scoutgate_prob_opt.unwrap_or(0.0);
 
-        for expert_key in all_keys {
-            // Get individual predictions (default to 0.0 if missing)
-            let ewma_prob = ewma_predictions.get(expert_key).copied().unwrap_or(0.0);
-            let scoutgate_prob = scoutgate_predictions
-                .get(expert_key)
-                .copied()
-                .unwrap_or(0.0);
+                // Step 1: Base fusion
+                // p^{base}_{e,ℓ}(t) := (1-η)·p̂^{EWMA}_{e,ℓ}(t) + η·p̂^{SG}_{e,ℓ}(t)
+                let base_prob = (1.0 - self.eta) * ewma_prob + self.eta * scoutgate_prob;
 
-            // Validate probability values
-            self.validate_probability(*expert_key, ewma_prob)?;
-            self.validate_probability(*expert_key, scoutgate_prob)?;
+                // Step 2: Calculate forward-causal weight
+                // W(ℓ|ℓ(t)) := e^{-γ·D(ℓ|ℓ(t))}
+                let reuse_distance = self.calculate_reuse_distance(layer_id, current_layer);
+                let causal_weight = self.calculate_causal_weight(reuse_distance);
 
-            // Step 1: Base fusion
-            // p^{base}_{e,ℓ}(t) := (1-η)·p̂^{EWMA}_{e,ℓ}(t) + η·p̂^{SG}_{e,ℓ}(t)
-            let base_prob = (1.0 - self.eta) * ewma_prob + self.eta * scoutgate_prob;
+                // Step 3: Final fusion
+                // p^{fuse}_{e,ℓ}(t) := p^{base}_{e,ℓ}(t) · W(ℓ|ℓ(t))
+                let fused_prob = base_prob * causal_weight;
 
-            // Step 2: Calculate forward-causal weight
-            // W(ℓ|ℓ(t)) := e^{-γ·D(ℓ|ℓ(t))}
-            let reuse_distance = self.calculate_reuse_distance(expert_key.layer_id, current_layer);
-            let causal_weight = self.calculate_causal_weight(reuse_distance);
-
-            // Step 3: Final fusion
-            // p^{fuse}_{e,ℓ}(t) := p^{base}_{e,ℓ}(t) · W(ℓ|ℓ(t))
-            let fused_prob = base_prob * causal_weight;
-
-            fused_predictions.insert(*expert_key, fused_prob);
+                // Store result in output structure
+                result.set(layer_id, expert_id, fused_prob);
+            }
         }
 
-        Ok(fused_predictions)
+        Ok(result)
     }
 
     /// Calculate layer reuse distance for forward-causal weights
@@ -169,28 +157,6 @@ impl ProbabilityFusion {
     /// Get gamma parameter (reuse distance decay factor)
     pub fn gamma(&self) -> f64 {
         self.gamma
-    }
-
-    /// Get total layers
-    pub fn total_layers(&self) -> usize {
-        self.total_layers
-    }
-
-    // Private helper methods
-
-    /// Validate that a probability value is in [0, 1]
-    fn validate_probability(
-        &self,
-        expert: AbstractExpert,
-        probability: f64,
-    ) -> Result<(), FusionError> {
-        if !(0.0..=1.0).contains(&probability) {
-            return Err(FusionError::InvalidProbability {
-                expert_key: format!("{:?}", expert),
-                probability,
-            });
-        }
-        Ok(())
     }
 }
 

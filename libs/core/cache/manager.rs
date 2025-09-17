@@ -60,14 +60,14 @@ impl RustTwoTireWmExpertCacheManager {
     ) -> Result<Self, String> {
         // Get model configuration from model_type using From trait
         let config: ModelConfig = model_type.clone().into();
-        let model_type_enum: ModelType = model_type.into();
+        let model_type: ModelType = model_type.into();
 
         // Create probability fusion
-        let probability_fuser = ProbabilityFusion::for_gptoss20b();
+        let probability_fuser = ProbabilityFusion::from_model(model_type);
 
         // Create watermark algorithm
         let watermark_algorithm =
-            WatermarkAlgorithm::from_model(model_type_enum, vram_capacity, ram_capacity);
+            WatermarkAlgorithm::from_model(model_type, vram_capacity, ram_capacity);
 
         // Create timer from model configuration
         let timer = Timer::from_model(&config);
