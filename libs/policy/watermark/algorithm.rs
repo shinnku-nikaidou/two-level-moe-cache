@@ -35,7 +35,7 @@ pub enum MemoryTier {
 }
 
 pub struct ExpertState {
-    inner: Vec<Vec<MemoryTier>>, // [layer][expert_idx] -> MemoryTier
+    pub inner: Vec<Vec<MemoryTier>>, // [layer][expert_idx] -> MemoryTier
 }
 
 impl ExpertState {
@@ -68,9 +68,6 @@ impl ExpertState {
 /// Manages two-tier expert caching using benefit density and adaptive watermarks.
 /// Receives fused probabilities and produces cache decisions based on watermark thresholds.
 pub struct WatermarkAlgorithm {
-    /// Model type for determining expert layout
-    model_type: ModelType,
-
     /// VRAM capacity in bytes (K_G)
     #[allow(dead_code)]
     vram_capacity: usize,
@@ -108,7 +105,6 @@ impl WatermarkAlgorithm {
     /// Create a new watermark algorithm instance
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        model_type: ModelType,
         vram_capacity: usize,
         ram_capacity: usize,
         vram_learning_rate: f64,
@@ -118,7 +114,6 @@ impl WatermarkAlgorithm {
         expert_size: usize,
     ) -> Self {
         Self {
-            model_type,
             vram_capacity,
             ram_capacity,
             vram_learning_rate,
@@ -145,7 +140,6 @@ impl WatermarkAlgorithm {
         };
 
         Self::new(
-            model_type,
             vram_capacity_mb * 1024 * 1024,
             ram_capacity_mb * 1024 * 1024,
             vram_lr,
@@ -156,60 +150,44 @@ impl WatermarkAlgorithm {
         )
     }
 
-    /// Advance to next time step and update watermarks
-    pub fn step(&mut self) {
-        self.current_time += 1;
-        self.update_watermarks();
-    }
-
     /// Make cache decisions based on fused probabilities
     ///
     /// This implements the core watermark decision logic:
     /// - Calculate benefit densities for each expert
     /// - Compare against current watermarks  
     /// - Generate appropriate cache decisions
-    pub fn make_cache_decisions(
-        &mut self,
-        fused_probabilities: &crate::ExpertProbability,
-    ) -> ExpertState {
-        // Create output state based on model configuration
-        let model_config: crate::constants::ModelConfig = self.model_type.into();
-        let mut expert_state =
-            ExpertState::new(model_config.total_layers, model_config.experts_per_layer);
+    pub fn make_cache_decisions(&mut self, fused_prob: &crate::ExpertProbability) -> ExpertState {
+        // Directly construct ExpertState using functional style
+        // Access inner data directly since it's now public
+        let inner = fused_prob
+            .inner
+            .iter()
+            .map(|layer_probs| {
+                layer_probs
+                    .iter()
+                    .map(|prob| {
+                        // Extract probability value, default to 0.0 if None
+                        let prob_value = prob.unwrap_or(0.0);
 
-        // Process each layer
-        for layer_id in 0..model_config.total_layers {
-            for expert_id in 0..model_config.experts_per_layer {
-                // Get fused probability for this expert
-                let probability = fused_probabilities.get(layer_id, expert_id).unwrap_or(0.0);
+                        // Calculate benefit densities using configuration
+                        let size = self.expert_size as f64;
+                        let vram_benefit = prob_value * self.cost_g / size;
+                        let ram_benefit = prob_value * self.cost_r / size;
 
-                // Validate probability
-                if !(0.0..=1.0).contains(&probability) {
-                    panic!(
-                        "Invalid probability {} for expert ({}, {})",
-                        probability, layer_id, expert_id
-                    );
-                }
+                        // Make cache decision based on watermarks
+                        if vram_benefit >= self.vram_watermark {
+                            MemoryTier::Vram
+                        } else if ram_benefit >= self.ram_watermark {
+                            MemoryTier::Ram
+                        } else {
+                            MemoryTier::Disk
+                        }
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
 
-                // Calculate benefit densities using configuration
-                let size = self.expert_size as f64;
-                let vram_benefit = probability * self.cost_g / size;
-                let ram_benefit = probability * self.cost_r / size;
-
-                // Make cache decision based on watermarks
-                let tier = if vram_benefit >= self.vram_watermark {
-                    MemoryTier::Vram
-                } else if ram_benefit >= self.ram_watermark {
-                    MemoryTier::Ram
-                } else {
-                    MemoryTier::Disk
-                };
-
-                expert_state.set(layer_id, expert_id, tier);
-            }
-        }
-
-        expert_state
+        ExpertState { inner }
     }
 
     /// Update watermarks using subgradient method
@@ -225,22 +203,5 @@ impl WatermarkAlgorithm {
         // Future enhancement: receive usage feedback from cache manager
         self.vram_watermark = (self.vram_watermark * 0.99).max(0.0); // Small decay
         self.ram_watermark = (self.ram_watermark * 0.99).max(0.0); // Small decay
-    }
-
-    /// Get current watermark values
-    pub fn get_watermarks(&self) -> (f64, f64) {
-        (self.vram_watermark, self.ram_watermark)
-    }
-
-    /// Get current time
-    pub fn current_time(&self) -> u64 {
-        self.current_time
-    }
-
-    /// Reset algorithm state
-    pub fn reset(&mut self) {
-        self.vram_watermark = 0.0;
-        self.ram_watermark = 0.0;
-        self.current_time = 0;
     }
 }

@@ -11,7 +11,7 @@ pub type Probability = Option<f64>; // Probability values in [0.0, 1.0]
 
 // Probability map per expert per layer
 pub struct ExpertProbability {
-    inner: Vec<Vec<Probability>>,
+    pub inner: Vec<Vec<Probability>>,
 }
 
 impl ExpertProbability {
