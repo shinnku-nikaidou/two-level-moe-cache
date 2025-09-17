@@ -66,8 +66,7 @@ impl RustTwoTireWmExpertCacheManager {
             .map_err(|e| format!("Failed to create probability fusion: {}", e))?;
 
         // Create watermark algorithm
-        let watermark_algorithm = WatermarkAlgorithm::for_gptoss20b(vram_capacity, ram_capacity)
-            .map_err(|e| format!("Failed to create watermark algorithm: {}", e))?;
+        let watermark_algorithm = WatermarkAlgorithm::for_gptoss20b(vram_capacity, ram_capacity);
 
         // Create timer from model configuration
         let timer = Timer::from_model(&config);

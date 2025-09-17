@@ -35,7 +35,7 @@ impl WatermarkConfig {
         ram_capacity: usize,
         vram_learning_rate: f64,
         ram_learning_rate: f64,
-    ) -> Result<Self, WatermarkConfigError> {
+    ) -> Self {
         let config = Self {
             vram_capacity,
             ram_capacity,
@@ -45,15 +45,12 @@ impl WatermarkConfig {
             nvme_to_ram_cost: 10.0,
             expert_size_bytes: 1024 * 1024, // 1MB default
         };
-        config.validate()?;
-        Ok(config)
+        config.validate().expect("Invalid watermark configuration");
+        config
     }
 
     /// Create configuration for GPT-OSS-20B model
-    pub fn for_gptoss20b(
-        vram_capacity_mb: usize,
-        ram_capacity_mb: usize,
-    ) -> Result<Self, WatermarkConfigError> {
+    pub fn for_gptoss20b(vram_capacity_mb: usize, ram_capacity_mb: usize) -> Self {
         Self::new(
             vram_capacity_mb * 1024 * 1024,
             ram_capacity_mb * 1024 * 1024,
@@ -63,29 +60,13 @@ impl WatermarkConfig {
     }
 
     /// Create configuration for GPT-OSS-120B model
-    pub fn for_gptoss120b(
-        vram_capacity_mb: usize,
-        ram_capacity_mb: usize,
-    ) -> Result<Self, WatermarkConfigError> {
+    pub fn for_gptoss120b(vram_capacity_mb: usize, ram_capacity_mb: usize) -> Self {
         Self::new(
             vram_capacity_mb * 1024 * 1024,
             ram_capacity_mb * 1024 * 1024,
-            0.005, // Smaller learning rates for larger model
+            0.005,
             0.005,
         )
-    }
-
-    /// Create configuration for testing
-    pub fn for_testing() -> Self {
-        Self {
-            vram_capacity: 100 * 1024 * 1024, // 100MB
-            ram_capacity: 500 * 1024 * 1024,  // 500MB
-            vram_learning_rate: 0.1,          // Higher learning rate for faster tests
-            ram_learning_rate: 0.1,
-            ram_to_vram_cost: 1.0,
-            nvme_to_ram_cost: 10.0,
-            expert_size_bytes: 1024 * 1024, // 1MB per expert
-        }
     }
 
     /// Validate configuration parameters

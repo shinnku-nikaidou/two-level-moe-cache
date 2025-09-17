@@ -31,7 +31,7 @@
 //! use std::collections::HashMap;
 //!
 //! // Create algorithm instance
-//! let mut algorithm = WatermarkAlgorithm::for_gptoss20b(512, 2048)?;
+//! let mut algorithm = WatermarkAlgorithm::for_gptoss20b(512, 2048);
 //!
 //! // Prepare fused probabilities
 //! let mut fused_probs = HashMap::new();

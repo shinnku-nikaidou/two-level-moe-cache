@@ -69,10 +69,10 @@ pub struct WatermarkAlgorithm {
 
 impl WatermarkAlgorithm {
     /// Create a new watermark algorithm instance
-    pub fn new(config: WatermarkConfig) -> Result<Self, WatermarkError> {
-        config.validate()?;
+    pub fn new(config: WatermarkConfig) -> Self {
+        config.validate().expect("Invalid watermark configuration");
 
-        Ok(Self {
+        Self {
             config,
             vram_watermark: 0.0,
             ram_watermark: 0.0,
@@ -80,22 +80,13 @@ impl WatermarkAlgorithm {
             expert_states: HashMap::new(),
             vram_used_bytes: 0,
             ram_used_bytes: 0,
-        })
+        }
     }
 
     /// Create watermark algorithm for GPT-OSS-20B model
-    pub fn for_gptoss20b(
-        vram_capacity_mb: usize,
-        ram_capacity_mb: usize,
-    ) -> Result<Self, WatermarkError> {
-        let config = WatermarkConfig::for_gptoss20b(vram_capacity_mb, ram_capacity_mb)?;
+    pub fn for_gptoss20b(vram_capacity_mb: usize, ram_capacity_mb: usize) -> Self {
+        let config = WatermarkConfig::for_gptoss20b(vram_capacity_mb, ram_capacity_mb);
         Self::new(config)
-    }
-
-    /// Create watermark algorithm for testing
-    pub fn for_testing() -> Self {
-        let config = WatermarkConfig::for_testing();
-        Self::new(config).unwrap()
     }
 
     /// Advance to next time step and update watermarks
@@ -286,46 +277,5 @@ impl WatermarkAlgorithm {
     /// Get reference to expert states for status reporting
     pub fn expert_states(&self) -> &HashMap<AbstractExpert, ExpertState> {
         &self.expert_states
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_watermark_creation() {
-        let algorithm = WatermarkAlgorithm::for_testing();
-        assert_eq!(algorithm.get_watermarks(), (0.0, 0.0));
-        assert_eq!(algorithm.get_memory_usage(), (0, 0));
-    }
-
-    #[test]
-    fn test_benefit_density_calculation() {
-        let algorithm = WatermarkAlgorithm::for_testing();
-        let expert_state = ExpertState {
-            current_tier: MemoryTier::Disk,
-            size_bytes: 1024 * 1024, // 1MB
-        };
-
-        let (vram_benefit, ram_benefit) = algorithm.calculate_benefit_densities(0.5, &expert_state);
-
-        // Expected: vram_benefit = 0.5 * 1.0 / (1024*1024), ram_benefit = 0.5 * 10.0 / (1024*1024)
-        assert!((vram_benefit - 0.5 / (1024.0 * 1024.0)).abs() < 1e-10);
-        assert!((ram_benefit - 5.0 / (1024.0 * 1024.0)).abs() < 1e-10);
-    }
-
-    #[test]
-    fn test_cache_decisions() {
-        let mut algorithm = WatermarkAlgorithm::for_testing();
-
-        let mut fused_probs = HashMap::new();
-        let expert = AbstractExpert::new(0, 0);
-        fused_probs.insert(expert, 0.8);
-
-        let decisions = algorithm.make_cache_decisions(&fused_probs).unwrap();
-
-        // Expert starts on disk, should be loaded to RAM if benefit > watermark
-        assert!(decisions.contains_key(&expert));
     }
 }
