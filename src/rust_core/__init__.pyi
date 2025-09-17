@@ -6,7 +6,7 @@ Updated during policy layer integration to include watermark debugging methods.
 All Rust PyClass exports now have "Rust" prefix for clear namespace separation.
 """
 
-from typing import Dict, List, Optional
+from typing import List, Optional
 from enum import IntEnum
 
 class RustMemoryTier(IntEnum):
@@ -91,26 +91,6 @@ class RustTwoTireWmExpertCacheManager:
 
     def step_forward(self) -> None:
         """Advance to next time step."""
-        ...
-    # New methods added during integration
-    def current_time(self) -> int:
-        """Get current time step."""
-        ...
-
-    def current_layer(self) -> int:
-        """Get current layer index."""
-        ...
-
-    def total_layers(self) -> int:
-        """Get total number of layers."""
-        ...
-
-    def get_watermarks(self) -> tuple[float, float]:
-        """Get current watermark values (VRAM, RAM) for debugging."""
-        ...
-
-    def get_memory_usage(self) -> tuple[int, int]:
-        """Get current memory usage (VRAM bytes, RAM bytes) for debugging."""
         ...
 
     def experts_status(self) -> List[RustExpertStatus]:

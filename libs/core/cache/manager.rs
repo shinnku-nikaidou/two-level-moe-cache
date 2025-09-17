@@ -3,7 +3,6 @@
 //! This module defines the main TwoTireWmExpertCacheManager struct and its
 //! core data structures, serving as a thin Python interface layer.
 
-use crate::types::core_expert::ExpertKey;
 use crate::types::model::RustModelType;
 use policy::{
     fusion::{FusionConfig, ProbabilityFusion},
@@ -21,10 +20,7 @@ pub struct RustTwoTireWmExpertCacheManager {
     pub(crate) timer: Timer,
 
     /// Probability fusion component
-    pub(crate) fusion: ProbabilityFusion,
-
-    /// All experts' keys in the model
-    pub(crate) all_experts_key: Vec<ExpertKey>,
+    pub(crate) probability_fuser: ProbabilityFusion,
 
     /// Watermark algorithm for cache decisions
     pub(crate) watermark_algorithm: WatermarkAlgorithm,
@@ -64,22 +60,9 @@ impl RustTwoTireWmExpertCacheManager {
         // Get model configuration from model_type using From trait
         let config = model_type.into();
 
-        // Generate all expert keys for this model
-        let all_experts_key = ExpertKey::all_experts(&config);
-
-        // Validate the generated expert keys count
-        let expected_count = config.total_layers * config.experts_per_layer * 4; // 4 param types per expert
-        if all_experts_key.len() != expected_count {
-            return Err(format!(
-                "Expert key count mismatch for model type : expected {}, got {}",
-                expected_count,
-                all_experts_key.len()
-            ));
-        }
-
         // Create probability fusion
         let fusion_config = FusionConfig::for_gptoss20b();
-        let fusion = ProbabilityFusion::new(fusion_config)
+        let probability_fuser = ProbabilityFusion::new(fusion_config)
             .map_err(|e| format!("Failed to create probability fusion: {}", e))?;
 
         // Create watermark algorithm
@@ -91,9 +74,8 @@ impl RustTwoTireWmExpertCacheManager {
 
         Ok(Self {
             timer,
-            fusion,
+            probability_fuser,
             watermark_algorithm,
-            all_experts_key,
         })
     }
 }

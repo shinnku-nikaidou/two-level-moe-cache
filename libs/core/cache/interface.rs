@@ -44,52 +44,31 @@ impl RustTwoTireWmExpertCacheManager {
         Ok(())
     }
 
-    /// Get current time
-    pub fn current_time(&self) -> u64 {
-        self.timer.current_time()
-    }
-
-    /// Get current layer
-    pub fn current_layer(&self) -> usize {
-        self.timer.current_layer()
-    }
-
-    /// Get total layers
-    pub fn total_layers(&self) -> usize {
-        self.timer.total_layers()
-    }
-
-    /// Get watermark values for debugging
-    pub fn get_watermarks(&self) -> (f64, f64) {
-        self.watermark_algorithm.get_watermarks()
-    }
-
-    /// Get memory usage for debugging
-    pub fn get_memory_usage(&self) -> (usize, usize) {
-        self.watermark_algorithm.get_memory_usage()
-    }
-
     /// Get simplified status of all tracked experts
     pub fn experts_status(&self) -> Vec<RustExpertStatus> {
         self.watermark_algorithm
             .expert_states()
-            .values()
-            .map(|expert_state| {
+            .iter()
+            .flat_map(|(expert, expert_state)| {
                 let tier_u8 = match expert_state.current_tier {
                     MemoryTier::VRAM => 0,
                     MemoryTier::RAM => 1,
                     MemoryTier::Disk => 2,
                 };
 
-                // Convert policy AbstractExpert to core ExpertKey (we need to add param_type)
-                // For now, use MLP1Weight as default param type since AbstractExpert doesn't have param_type
-                let core_expert_key = RustExpertKey::new(
-                    expert_state.expert.layer_id,
-                    expert_state.expert.expert_id,
+                // Generate RustExpertKey for all 4 parameter types per expert
+                vec![
                     crate::types::expert::RustExpertParamType::MLP1_WEIGHT,
-                );
-
-                RustExpertStatus::new(core_expert_key, tier_u8)
+                    crate::types::expert::RustExpertParamType::MLP1_BIAS,
+                    crate::types::expert::RustExpertParamType::MLP2_WEIGHT,
+                    crate::types::expert::RustExpertParamType::MLP2_BIAS,
+                ]
+                .into_iter()
+                .map(move |param_type| {
+                    let core_expert_key =
+                        RustExpertKey::new(expert.layer_id, expert.expert_id, param_type);
+                    RustExpertStatus::new(core_expert_key, tier_u8)
+                })
             })
             .collect()
     }

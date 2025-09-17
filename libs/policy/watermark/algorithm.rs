@@ -40,10 +40,8 @@ pub enum MemoryTier {
 /// Expert state for watermark tracking
 #[derive(Debug, Clone)]
 pub struct ExpertState {
-    pub expert: AbstractExpert,
     pub current_tier: MemoryTier,
     pub size_bytes: usize,
-    pub last_access_time: u64,
 }
 
 /// Dual watermark algorithm implementation  
@@ -206,10 +204,8 @@ impl WatermarkAlgorithm {
         self.expert_states
             .entry(expert)
             .or_insert_with(|| ExpertState {
-                expert,
                 current_tier: MemoryTier::Disk,
                 size_bytes: self.config.expert_size_bytes,
-                last_access_time: self.current_time,
             })
     }
 
@@ -254,7 +250,6 @@ impl WatermarkAlgorithm {
             }
         }
 
-        expert_state.last_access_time = self.current_time;
         Ok(())
     }
 
@@ -309,10 +304,8 @@ mod tests {
     fn test_benefit_density_calculation() {
         let algorithm = WatermarkAlgorithm::for_testing();
         let expert_state = ExpertState {
-            expert: AbstractExpert::new(0, 0),
             current_tier: MemoryTier::Disk,
             size_bytes: 1024 * 1024, // 1MB
-            last_access_time: 0,
         };
 
         let (vram_benefit, ram_benefit) = algorithm.calculate_benefit_densities(0.5, &expert_state);

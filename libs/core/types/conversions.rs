@@ -49,17 +49,3 @@ where
     }
     Ok(value)
 }
-
-/// Convert from policy::ExpertParamType to core::types::expert::RustExpertParamType
-use crate::types::core_expert::ExpertParamType;
-
-impl From<ExpertParamType> for crate::types::expert::RustExpertParamType {
-    fn from(policy_param_type: ExpertParamType) -> Self {
-        match policy_param_type {
-            ExpertParamType::MLP1Weight => Self::MLP1_WEIGHT,
-            ExpertParamType::MLP1Bias => Self::MLP1_BIAS,
-            ExpertParamType::MLP2Weight => Self::MLP2_WEIGHT,
-            ExpertParamType::MLP2Bias => Self::MLP2_BIAS,
-        }
-    }
-}
