@@ -1,16 +1,11 @@
 //! Error types for probability fusion operations
 //!
 //! This module defines error types that can occur during probability fusion,
-//! including configuration validation and runtime fusion errors.
-
-pub use super::config::FusionConfigError;
+//! including runtime fusion errors.
 
 /// Error types for probability fusion operations
 #[derive(Debug, Clone, PartialEq)]
 pub enum FusionError {
-    /// Configuration error
-    Config(FusionConfigError),
-
     /// Invalid current layer (must be < total_layers)
     InvalidCurrentLayer {
         current_layer: usize,
@@ -33,9 +28,6 @@ pub enum FusionError {
 impl std::fmt::Display for FusionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FusionError::Config(config_err) => {
-                write!(f, "Fusion configuration error: {}", config_err)
-            }
             FusionError::InvalidCurrentLayer {
                 current_layer,
                 total_layers,
@@ -71,9 +63,3 @@ impl std::fmt::Display for FusionError {
 }
 
 impl std::error::Error for FusionError {}
-
-impl From<FusionConfigError> for FusionError {
-    fn from(config_error: FusionConfigError) -> Self {
-        FusionError::Config(config_error)
-    }
-}

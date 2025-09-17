@@ -4,11 +4,7 @@
 //! core data structures, serving as a thin Python interface layer.
 
 use crate::types::model::RustModelType;
-use policy::{
-    fusion::{FusionConfig, ProbabilityFusion},
-    timer::Timer,
-    watermark::WatermarkAlgorithm,
-};
+use policy::{fusion::ProbabilityFusion, timer::Timer, watermark::WatermarkAlgorithm};
 use pyo3::prelude::*;
 /// Thin Python interface for the two-level MOE cache system
 ///
@@ -61,9 +57,7 @@ impl RustTwoTireWmExpertCacheManager {
         let config = model_type.into();
 
         // Create probability fusion
-        let fusion_config = FusionConfig::for_gptoss20b();
-        let probability_fuser = ProbabilityFusion::new(fusion_config)
-            .map_err(|e| format!("Failed to create probability fusion: {}", e))?;
+        let probability_fuser = ProbabilityFusion::for_gptoss20b();
 
         // Create watermark algorithm
         let watermark_algorithm = WatermarkAlgorithm::for_gptoss20b(vram_capacity, ram_capacity);

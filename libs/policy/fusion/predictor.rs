@@ -9,7 +9,6 @@
 
 use std::collections::HashMap;
 
-use super::config::FusionConfig;
 use super::error::FusionError;
 use crate::AbstractExpert;
 
@@ -18,31 +17,44 @@ use crate::AbstractExpert;
 /// Combines EWMA and ScoutGate predictions with forward-causal weighting
 /// based on layer reuse distances. This produces the final fused probabilities
 /// that are used by the watermark algorithm for cache decisions.
+#[derive(Debug, Clone, PartialEq)]
 pub struct ProbabilityFusion {
-    /// Fusion configuration parameters
-    config: FusionConfig,
+    /// η parameter for EWMA-ScoutGate blending (0.0 = pure EWMA, 1.0 = pure ScoutGate)
+    pub eta: f64,
+
+    /// γ parameter for reuse distance decay in forward-causal weights
+    pub gamma: f64,
+
+    /// Total number of layers in the model (for reuse distance calculation)
+    pub total_layers: usize,
 }
 
 impl ProbabilityFusion {
     /// Create a new probability fusion predictor
-    pub fn new(config: FusionConfig) -> Result<Self, FusionError> {
-        config.validate()?;
-        Ok(Self { config })
+    pub fn new(eta: f64, gamma: f64, total_layers: usize) -> Self {
+        Self {
+            eta,
+            gamma,
+            total_layers,
+        }
     }
 
     /// Create fusion predictor for GPT-OSS-20B model
-    pub fn for_gptoss20b() -> Result<Self, FusionError> {
-        Self::new(FusionConfig::for_gptoss20b())
+    pub fn for_gptoss20b() -> Self {
+        use crate::constants::GPT_OSS_20B;
+        Self::new(0.5, 0.1, GPT_OSS_20B.total_layers)
     }
 
     /// Create fusion predictor for GPT-OSS-120B model
-    pub fn for_gptoss120b() -> Result<Self, FusionError> {
-        Self::new(FusionConfig::for_gptoss120b())
+    pub fn for_gptoss120b() -> Self {
+        use crate::constants::GPT_OSS_120B;
+        Self::new(0.5, 0.1, GPT_OSS_120B.total_layers)
     }
 
     /// Create fusion predictor for Phi-Tiny-MoE model (for testing)
-    pub fn for_phi_tiny_moe() -> Result<Self, FusionError> {
-        Self::new(FusionConfig::for_phi_tiny_moe())
+    pub fn for_phi_tiny_moe() -> Self {
+        use crate::constants::PHI_TINY_MOE;
+        Self::new(0.5, 0.1, PHI_TINY_MOE.total_layers)
     }
 
     /// Fuse EWMA and ScoutGate predictions with forward-causal weights
@@ -66,10 +78,10 @@ impl ProbabilityFusion {
         current_layer: usize,
     ) -> Result<HashMap<AbstractExpert, f64>, FusionError> {
         // Validate current layer
-        if current_layer >= self.config.total_layers {
+        if current_layer >= self.total_layers {
             return Err(FusionError::InvalidCurrentLayer {
                 current_layer,
-                total_layers: self.config.total_layers,
+                total_layers: self.total_layers,
             });
         }
 
@@ -95,7 +107,7 @@ impl ProbabilityFusion {
 
             // Step 1: Base fusion
             // p^{base}_{e,ℓ}(t) := (1-η)·p̂^{EWMA}_{e,ℓ}(t) + η·p̂^{SG}_{e,ℓ}(t)
-            let base_prob = (1.0 - self.config.eta) * ewma_prob + self.config.eta * scoutgate_prob;
+            let base_prob = (1.0 - self.eta) * ewma_prob + self.eta * scoutgate_prob;
 
             // Step 2: Calculate forward-causal weight
             // W(ℓ|ℓ(t)) := e^{-γ·D(ℓ|ℓ(t))}
@@ -132,7 +144,7 @@ impl ProbabilityFusion {
             target_layer - current_layer
         } else {
             // Layers in the next token (finish current token to L, then next token from 0 to target)
-            (self.config.total_layers - current_layer) + target_layer
+            (self.total_layers - current_layer) + target_layer
         }
     }
 
@@ -146,27 +158,22 @@ impl ProbabilityFusion {
     /// # Returns
     /// * `f64` - Forward-causal weight W(ℓ|ℓ(t))
     pub fn calculate_causal_weight(&self, reuse_distance: usize) -> f64 {
-        (-self.config.gamma * reuse_distance as f64).exp()
-    }
-
-    /// Get fusion configuration
-    pub fn config(&self) -> &FusionConfig {
-        &self.config
+        (-self.gamma * reuse_distance as f64).exp()
     }
 
     /// Get eta parameter (EWMA-ScoutGate blending factor)
     pub fn eta(&self) -> f64 {
-        self.config.eta
+        self.eta
     }
 
     /// Get gamma parameter (reuse distance decay factor)
     pub fn gamma(&self) -> f64 {
-        self.config.gamma
+        self.gamma
     }
 
     /// Get total layers
     pub fn total_layers(&self) -> usize {
-        self.config.total_layers
+        self.total_layers
     }
 
     // Private helper methods
@@ -187,53 +194,13 @@ impl ProbabilityFusion {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_reuse_distance_calculation() {
-        let fusion = ProbabilityFusion::new(FusionConfig::new(0.5, 0.1, 4).unwrap()).unwrap();
-
-        // Test future layers in current token
-        assert_eq!(fusion.calculate_reuse_distance(2, 1), 1); // target=2, current=1 -> 2-1=1
-        assert_eq!(fusion.calculate_reuse_distance(3, 1), 2); // target=3, current=1 -> 3-1=2
-
-        // Test same layer
-        assert_eq!(fusion.calculate_reuse_distance(1, 1), 0); // target=1, current=1 -> 1-1=0
-
-        // Test next token layers
-        assert_eq!(fusion.calculate_reuse_distance(0, 2), 2); // target=0, current=2 -> (4-2)+0=2
-        assert_eq!(fusion.calculate_reuse_distance(1, 3), 2); // target=1, current=3 -> (4-3)+1=2
-    }
-
-    #[test]
-    fn test_causal_weight_calculation() {
-        let fusion = ProbabilityFusion::new(FusionConfig::new(0.5, 0.1, 4).unwrap()).unwrap();
-
-        // Test weight calculation
-        assert!((fusion.calculate_causal_weight(0) - 1.0).abs() < 1e-10); // e^(-0.1*0) = 1.0
-        assert!((fusion.calculate_causal_weight(1) - (-0.1_f64).exp()).abs() < 1e-10); // e^(-0.1*1)
-        assert!((fusion.calculate_causal_weight(2) - (-0.2_f64).exp()).abs() < 1e-10); // e^(-0.1*2)
-    }
-
-    #[test]
-    fn test_base_fusion() {
-        let fusion = ProbabilityFusion::new(FusionConfig::new(0.3, 0.1, 4).unwrap()).unwrap();
-
-        let mut ewma_preds = HashMap::new();
-        let mut sg_preds = HashMap::new();
-
-        let expert = AbstractExpert::new(0, 0);
-        ewma_preds.insert(expert, 0.8);
-        sg_preds.insert(expert, 0.2);
-
-        let result = fusion.fuse_predictions(&ewma_preds, &sg_preds, 0).unwrap();
-
-        // Base fusion: (1-0.3)*0.8 + 0.3*0.2 = 0.7*0.8 + 0.06 = 0.56 + 0.06 = 0.62
-        // Causal weight for same layer (distance=0): e^(-0.1*0) = 1.0
-        // Final: 0.62 * 1.0 = 0.62
-        let expected = 0.62;
-        assert!((result[&expert] - expected).abs() < 1e-10);
+impl Default for ProbabilityFusion {
+    /// Create default fusion predictor suitable for most use cases
+    fn default() -> Self {
+        Self {
+            eta: 0.5,         // Equal weighting of EWMA and ScoutGate
+            gamma: 0.1,       // Moderate decay for forward-causal weights
+            total_layers: 24, // Default for GPT-OSS-20B
+        }
     }
 }

@@ -18,22 +18,11 @@ pub struct FusionConfig {
 
 impl FusionConfig {
     /// Create a new fusion configuration
-    pub fn new(eta: f64, gamma: f64, total_layers: usize) -> Result<Self, FusionConfigError> {
-        let config = Self {
+    pub fn new(eta: f64, gamma: f64, total_layers: usize) -> Self {
+        Self {
             eta,
             gamma,
             total_layers,
-        };
-        config.validate()?;
-        Ok(config)
-    }
-
-    /// Create default configuration suitable for most use cases
-    pub fn default() -> Self {
-        Self {
-            eta: 0.5,         // Equal weighting of EWMA and ScoutGate
-            gamma: 0.1,       // Moderate decay for forward-causal weights
-            total_layers: 24, // Default for GPT-OSS-20B
         }
     }
 
@@ -66,52 +55,15 @@ impl FusionConfig {
             total_layers: PHI_TINY_MOE.total_layers,
         }
     }
-
-    /// Validate configuration parameters
-    pub fn validate(&self) -> Result<(), FusionConfigError> {
-        if !(0.0..=1.0).contains(&self.eta) {
-            return Err(FusionConfigError::InvalidEta(self.eta));
-        }
-
-        if self.gamma <= 0.0 {
-            return Err(FusionConfigError::InvalidGamma(self.gamma));
-        }
-
-        if self.total_layers == 0 {
-            return Err(FusionConfigError::InvalidLayers(self.total_layers));
-        }
-
-        Ok(())
-    }
 }
 
-/// Error types for fusion configuration
-#[derive(Debug, Clone, PartialEq)]
-pub enum FusionConfigError {
-    /// Invalid eta parameter (must be in [0,1])
-    InvalidEta(f64),
-
-    /// Invalid gamma parameter (must be > 0)
-    InvalidGamma(f64),
-
-    /// Invalid total layers (must be > 0)
-    InvalidLayers(usize),
-}
-
-impl std::fmt::Display for FusionConfigError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            FusionConfigError::InvalidEta(eta) => {
-                write!(f, "Invalid eta parameter {} (must be in [0,1])", eta)
-            }
-            FusionConfigError::InvalidGamma(gamma) => {
-                write!(f, "Invalid gamma parameter {} (must be > 0)", gamma)
-            }
-            FusionConfigError::InvalidLayers(layers) => {
-                write!(f, "Invalid total_layers {} (must be > 0)", layers)
-            }
+impl Default for FusionConfig {
+    /// Create default configuration suitable for most use cases
+    fn default() -> Self {
+        Self {
+            eta: 0.5,         // Equal weighting of EWMA and ScoutGate
+            gamma: 0.1,       // Moderate decay for forward-causal weights
+            total_layers: 24, // Default for GPT-OSS-20B
         }
     }
 }
-
-impl std::error::Error for FusionConfigError {}

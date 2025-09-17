@@ -33,12 +33,12 @@
 //! ## Usage Example
 //!
 //! ```rust
-//! use policy::fusion::{ProbabilityFusion, FusionConfig};
+//! use policy::fusion::ProbabilityFusion;
 //! use policy::ExpertKey;
 //! use std::collections::HashMap;
 //!
 //! // Create fusion predictor
-//! let fusion = ProbabilityFusion::for_gptoss20b()?;
+//! let fusion = ProbabilityFusion::for_gptoss20b();
 //!
 //! // Prepare prediction maps
 //! let mut ewma_preds = HashMap::new();
@@ -53,10 +53,8 @@
 //! let fused_prob = fused[&expert_key];
 //! ```
 
-pub mod config;
 pub mod error;
 pub mod predictor;
 
-pub use config::{FusionConfig, FusionConfigError};
 pub use error::FusionError;
 pub use predictor::ProbabilityFusion;
