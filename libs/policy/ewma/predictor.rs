@@ -75,7 +75,7 @@ impl EwmaPredictor {
         activated_experts: &[usize],
     ) -> Result<(), EwmaError> {
         // Get current layer from shared timer
-        let current_layer = self.timer.current_layer()?;
+        let current_layer = self.timer.current_layer();
 
         // Get all possible experts for this layer
         let layer_experts =

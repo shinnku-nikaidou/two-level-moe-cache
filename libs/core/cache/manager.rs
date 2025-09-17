@@ -6,20 +6,19 @@
 use crate::types::core_expert::ExpertKey;
 use crate::types::model::RustModelType;
 use policy::{
-    constants::models::ModelConfig,
     fusion::{FusionConfig, ProbabilityFusion},
+    timer::Timer,
     watermark::WatermarkAlgorithm,
 };
 use pyo3::prelude::*;
-
 /// Thin Python interface for the two-level MOE cache system
 ///
 /// This is the CORRECT architecture implementation:
 /// Core layer is ONLY a Python interface - all business logic in policy layer
 #[pyclass]
 pub struct RustTwoTireWmExpertCacheManager {
-    /// Current time for tracking
-    pub(crate) current_time: u64,
+    /// Timer for time step management
+    pub(crate) timer: Timer,
 
     /// Probability fusion component
     pub(crate) fusion: ProbabilityFusion,
@@ -87,8 +86,11 @@ impl RustTwoTireWmExpertCacheManager {
         let watermark_algorithm = WatermarkAlgorithm::for_gptoss20b(vram_capacity, ram_capacity)
             .map_err(|e| format!("Failed to create watermark algorithm: {}", e))?;
 
+        // Create timer from model configuration
+        let timer = Timer::from_model(&config);
+
         Ok(Self {
-            current_time: 0,
+            timer,
             fusion,
             watermark_algorithm,
             all_experts_key,

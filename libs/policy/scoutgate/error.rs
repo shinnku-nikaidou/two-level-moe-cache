@@ -53,12 +53,3 @@ impl fmt::Display for ScoutGateError {
 }
 
 impl std::error::Error for ScoutGateError {}
-
-/// Convert timer errors to ScoutGate errors
-impl From<crate::timer::TimerError> for ScoutGateError {
-    fn from(error: crate::timer::TimerError) -> Self {
-        ScoutGateError::TimerError {
-            message: error.to_string(),
-        }
-    }
-}

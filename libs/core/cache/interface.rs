@@ -37,7 +37,7 @@ impl RustTwoTireWmExpertCacheManager {
 
     /// Advance to next time step
     pub fn step_forward(&mut self) -> PyResult<()> {
-        self.current_time += 1;
+        self.timer.step();
         // Step the watermark algorithm
         self.watermark_algorithm.step();
 
@@ -46,17 +46,17 @@ impl RustTwoTireWmExpertCacheManager {
 
     /// Get current time
     pub fn current_time(&self) -> u64 {
-        self.current_time
+        self.timer.current_time()
     }
 
     /// Get current layer
     pub fn current_layer(&self) -> usize {
-        todo!()
+        self.timer.current_layer()
     }
 
     /// Get total layers
     pub fn total_layers(&self) -> usize {
-        todo!()
+        self.timer.total_layers()
     }
 
     /// Get watermark values for debugging

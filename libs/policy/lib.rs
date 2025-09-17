@@ -25,7 +25,7 @@ impl AbstractExpert {
     }
 
     /// Create an AbstractExpert with validation against model configuration
-    pub fn with_validation(
+    pub fn new_with_validation(
         expert_id: usize,
         layer_id: usize,
         config: &constants::models::ModelConfig,
