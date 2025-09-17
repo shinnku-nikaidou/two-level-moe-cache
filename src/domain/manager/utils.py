@@ -9,8 +9,8 @@ from src.common.types import ExpertKey, ExpertParamType
 from src.domain import ModelType
 
 # Import the Rust types
-from rust_core import ExpertKey as RustExpertKey
-from rust_core import ExpertParamType as RustExpertParamType
+from rust_core import RustExpertKey
+from rust_core import RustExpertParamType
 
 
 def python_to_rust_key(key: ExpertKey) -> RustExpertKey:

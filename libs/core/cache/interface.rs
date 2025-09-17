@@ -4,7 +4,7 @@
 //! for the TwoTireWmExpertCacheManager.
 
 use super::manager::RustTwoTireWmExpertCacheManager;
-use crate::types::{expert::RustExpertKey, model::ModelType, status::RustExpertStatus};
+use crate::types::{expert::RustExpertKey, model::RustModelType, status::RustExpertStatus};
 use policy::watermark::MemoryTier;
 use pyo3::prelude::*;
 
@@ -12,7 +12,7 @@ use pyo3::prelude::*;
 impl RustTwoTireWmExpertCacheManager {
     #[new]
     pub fn py_new(
-        model_type: ModelType,
+        model_type: RustModelType,
         vram_capacity: usize,
         ram_capacity: usize,
     ) -> PyResult<Self> {

@@ -8,19 +8,19 @@ use pyo3::{Bound, PyAny};
 
 /// Python-compatible model type
 #[derive(Debug, Clone)]
-pub enum ModelType {
+pub enum RustModelType {
     GptOss20B,
     GptOss120B,
     PhiTinyMoe,
 }
 
-impl FromPyObject<'_> for ModelType {
+impl FromPyObject<'_> for RustModelType {
     fn extract_bound(ob: &Bound<'_, PyAny>) -> PyResult<Self> {
         let value: &str = ob.extract()?;
         match value {
-            "gpt-oss-20b" => Ok(ModelType::GptOss20B),
-            "gpt-oss-120b" => Ok(ModelType::GptOss120B),
-            "phi-tiny-moe" => Ok(ModelType::PhiTinyMoe),
+            "gpt-oss-20b" => Ok(RustModelType::GptOss20B),
+            "gpt-oss-120b" => Ok(RustModelType::GptOss120B),
+            "phi-tiny-moe" => Ok(RustModelType::PhiTinyMoe),
             _ => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
                 "Invalid ModelType: {}",
                 value
@@ -29,16 +29,16 @@ impl FromPyObject<'_> for ModelType {
     }
 }
 
-impl<'py> IntoPyObject<'py> for ModelType {
+impl<'py> IntoPyObject<'py> for RustModelType {
     type Target = PyAny;
     type Output = Bound<'py, Self::Target>;
     type Error = std::convert::Infallible;
 
     fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
         let value = match self {
-            ModelType::GptOss20B => "gpt-oss-20b",
-            ModelType::GptOss120B => "gpt-oss-120b",
-            ModelType::PhiTinyMoe => "phi-tiny-moe",
+            RustModelType::GptOss20B => "gpt-oss-20b",
+            RustModelType::GptOss120B => "gpt-oss-120b",
+            RustModelType::PhiTinyMoe => "phi-tiny-moe",
         };
         Ok(value.into_pyobject(py).unwrap().into_any())
     }
