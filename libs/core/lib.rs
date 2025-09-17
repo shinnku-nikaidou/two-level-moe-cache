@@ -17,7 +17,6 @@ pub fn core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // New two-tier watermark cache types
     m.add_class::<types::MemoryTier>()?;
     m.add_class::<types::ExpertKey>()?;
-    m.add_class::<types::ExpertRef>()?;
     m.add_class::<types::WatermarkConfig>()?;
     m.add_class::<types::ExpertParamType>()?;
     m.add_class::<cache::TwoTireWmExpertCacheManager>()?;

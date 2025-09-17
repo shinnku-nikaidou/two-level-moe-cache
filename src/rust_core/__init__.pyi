@@ -38,19 +38,6 @@ class ExpertKey:
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
 
-class ExpertRef:
-    """Reference to an expert with memory tier and size information."""
-
-    def __init__(self, key: ExpertKey) -> None: ...
-    @property
-    def key(self) -> ExpertKey: ...
-    @property
-    def tier(self) -> Optional[MemoryTier]: ...
-    @property
-    def size(self) -> int: ...
-    def set_tier(self, tier: Optional[MemoryTier]) -> None: ...
-    def set_size(self, size: int) -> None: ...
-
 class WatermarkConfig:
     """Configuration for watermark-based caching algorithm."""
 
@@ -58,10 +45,10 @@ class WatermarkConfig:
         self,
         vram_capacity: int,
         ram_capacity: int,
-        vram_learning_rate: float = 0.01,
-        ram_learning_rate: float = 0.01,
-        fusion_eta: float = 0.3,
-        reuse_decay_gamma: float = 0.1,
+        vram_learning_rate: Optional[float] = None,
+        ram_learning_rate: Optional[float] = None,
+        fusion_eta: Optional[float] = None,
+        reuse_decay_gamma: Optional[float] = None,
     ) -> None: ...
     @property
     def vram_capacity(self) -> int: ...
@@ -83,7 +70,7 @@ class TwoTireWmExpertCacheManager:
         vram_capacity: int,  # Capacity in bytes
         ram_capacity: int,  # Capacity in bytes
     ) -> None: ...
-    def get(self, expert_key: ExpertKey) -> ExpertRef:
+    def get(self, expert_key: ExpertKey) -> None:
         """Get a single expert by key, loading if necessary."""
         ...
 

@@ -6,8 +6,6 @@
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use super::memory::MemoryTier;
-
 /// Expert parameter type matching Python's ExpertParamType
 #[pyclass]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -139,54 +137,5 @@ impl ExpertKey {
 
     pub fn __eq__(&self, other: &Self) -> bool {
         self == other
-    }
-}
-
-/// Expert wrapper for Python interop (simplified version)
-/// The actual Expert object management happens in Python side
-#[pyclass]
-#[derive(Debug, Clone)]
-pub struct ExpertRef {
-    #[pyo3(get)]
-    pub expert_key: ExpertKey,
-    #[pyo3(get)]
-    pub current_tier: Option<MemoryTier>,
-    #[pyo3(get)]
-    pub is_loaded: bool,
-    #[pyo3(get)]
-    pub size_bytes: Option<usize>,
-}
-
-#[pymethods]
-impl ExpertRef {
-    #[new]
-    pub fn new(expert_key: ExpertKey) -> Self {
-        Self {
-            expert_key,
-            current_tier: None,
-            is_loaded: false,
-            size_bytes: None,
-        }
-    }
-
-    pub fn set_tier(&mut self, tier: Option<MemoryTier>) {
-        self.current_tier = tier;
-        self.is_loaded = tier.is_some();
-    }
-
-    pub fn set_size(&mut self, size_bytes: usize) {
-        self.size_bytes = Some(size_bytes);
-    }
-
-    pub fn is_in_vram(&self) -> bool {
-        matches!(self.current_tier, Some(MemoryTier::VRAM))
-    }
-
-    pub fn is_in_ram(&self) -> bool {
-        matches!(self.current_tier, Some(MemoryTier::RAM))
-    }
-
-    pub fn is_on_disk(&self) -> bool {
-        matches!(self.current_tier, Some(MemoryTier::DISK)) || self.current_tier.is_none()
     }
 }

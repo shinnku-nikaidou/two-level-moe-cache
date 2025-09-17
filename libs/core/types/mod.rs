@@ -12,6 +12,6 @@ pub mod model;
 // Re-export all public types
 pub use config::WatermarkConfig;
 pub use conversions::*;
-pub use expert::{ExpertKey, ExpertParamType, ExpertRef};
+pub use expert::{ExpertKey, ExpertParamType};
 pub use memory::MemoryTier;
 pub use model::ModelType;

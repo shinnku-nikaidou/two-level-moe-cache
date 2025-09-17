@@ -9,7 +9,7 @@ use policy::{ExpertKey as PolicyExpertKey, ExpertParamType};
 
 use super::manager::TwoTireWmExpertCacheManager;
 use super::mock;
-use crate::types::{ExpertKey, ExpertRef, MemoryTier, ModelType};
+use crate::types::{ExpertKey, ModelType};
 
 #[pymethods]
 impl TwoTireWmExpertCacheManager {
@@ -25,7 +25,7 @@ impl TwoTireWmExpertCacheManager {
     }
 
     /// Get expert by key - delegates to policy layer (mock implementation)
-    pub fn get(&mut self, expert_key: ExpertKey) -> PyResult<ExpertRef> {
+    pub fn get(&mut self, expert_key: ExpertKey) -> PyResult<()> {
         // Convert Python ExpertKey to Policy ExpertKey
         let policy_key = PolicyExpertKey::new(
             expert_key.expert_id,
@@ -34,19 +34,11 @@ impl TwoTireWmExpertCacheManager {
         );
 
         // Delegate to mock implementation
-        let (should_cache, _ewma_prob) =
+        let (_should_cache, _ewma_prob) =
             mock::get_cache_decision(&mut self.mock_ewma_probs, &policy_key);
 
-        // Return expert reference with tier information
-        let mut expert_ref = ExpertRef::new(expert_key);
-        expert_ref.set_tier(if should_cache {
-            Some(MemoryTier::VRAM)
-        } else {
-            Some(MemoryTier::DISK)
-        });
-        expert_ref.set_size(1024); // Default size
-
-        Ok(expert_ref)
+        // No need to return anything since ExpertRef is unused
+        Ok(())
     }
 
     /// Update with new layer activations - delegates to policy layer (mock implementation)

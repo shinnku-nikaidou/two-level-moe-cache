@@ -15,7 +15,6 @@ from .. import ModelType
 from rust_core import TwoTireWmExpertCacheManager as RustTwoTireWmExpertCacheManager
 from rust_core import WatermarkConfig as RustWatermarkConfig
 from rust_core import ExpertKey as RustExpertKey
-from rust_core import ExpertRef as RustExpertRef
 from rust_core import ExpertParamType as RustExpertParamType
 from rust_core import MemoryTier as RustMemoryTier
 
@@ -83,11 +82,11 @@ class TwoTireWmExpertCacheManager(IExpertCacheManager):
         Raises:
             KeyError: If expert cannot be loaded
         """
-        # Convert our ExpertKey to Rust format
+        # Convert our ExpertKey to Rust format and trigger cache decision
         rust_key = self._python_to_rust_key(key)
-        rust_expert_ref = self._rust_cache.get(rust_key)
+        self._rust_cache.get(rust_key)
 
-        # Get the Python Expert instance and update it
+        # Get the Python Expert instance and return it
         expert = self._get_expert(key)
 
         return expert

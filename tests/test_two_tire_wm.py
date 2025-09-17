@@ -18,7 +18,7 @@ def test_rust_imports():
     print("=== Testing Rust Core Imports ===")
 
     from rust_core import TwoTireWmExpertCacheManager
-    from rust_core import WatermarkConfig, ExpertRef, ExpertKey
+    from rust_core import WatermarkConfig, ExpertKey
 
     print("✅ Rust core library imported successfully")
     return True

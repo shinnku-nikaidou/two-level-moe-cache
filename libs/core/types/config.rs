@@ -21,13 +21,12 @@ pub struct WatermarkConfig {
     pub fusion_eta: f64, // η for EWMA-ScoutGate fusion
     #[pyo3(get, set)]
     pub reuse_decay_gamma: f64, // γ for reuse distance decay
-    #[pyo3(get, set)]
-    pub hysteresis_factor: f64, // Factor for admit/evict threshold separation
 }
 
 #[pymethods]
 impl WatermarkConfig {
     #[new]
+    #[pyo3(signature = (vram_capacity, ram_capacity, vram_learning_rate=None, ram_learning_rate=None, fusion_eta=None, reuse_decay_gamma=None))]
     pub fn new(
         vram_capacity: usize,
         ram_capacity: usize,
@@ -35,7 +34,6 @@ impl WatermarkConfig {
         ram_learning_rate: Option<f64>,
         fusion_eta: Option<f64>,
         reuse_decay_gamma: Option<f64>,
-        hysteresis_factor: Option<f64>,
     ) -> Self {
         Self {
             vram_capacity,
@@ -44,7 +42,6 @@ impl WatermarkConfig {
             ram_learning_rate: ram_learning_rate.unwrap_or(0.01),
             fusion_eta: fusion_eta.unwrap_or(0.5),
             reuse_decay_gamma: reuse_decay_gamma.unwrap_or(0.1),
-            hysteresis_factor: hysteresis_factor.unwrap_or(1.1),
         }
     }
 
@@ -77,11 +74,6 @@ impl WatermarkConfig {
         if self.reuse_decay_gamma <= 0.0 {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
                 "reuse_decay_gamma must be > 0",
-            ));
-        }
-        if self.hysteresis_factor < 1.0 {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                "hysteresis_factor must be >= 1.0",
             ));
         }
         Ok(())

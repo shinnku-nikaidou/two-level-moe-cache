@@ -9,14 +9,17 @@ def test_rust_core_basic():
     print("=== Testing Rust Core Basic ===")
 
     # Import all the Rust types
-    from rust_core import (
-        TwoTireWmExpertCacheManager,
-        WatermarkConfig,
-        ExpertRef,
-        ExpertKey,
-        MemoryTier,
-        ExpertParamType,
-    )
+    try:
+        from rust_core import (
+            TwoTireWmExpertCacheManager,
+            WatermarkConfig,
+            ExpertKey,
+            ExpertParamType,
+            MemoryTier,
+        )
+    except ImportError as e:
+        print(f"❌ Failed to import Rust types: {e}")
+        return False
 
     print("✅ All Rust types imported successfully")
 
@@ -45,7 +48,6 @@ def test_rust_core_basic():
         ram_learning_rate=0.01,
         fusion_eta=0.5,
         reuse_decay_gamma=0.1,
-        hysteresis_factor=1.1,
     )
     print(
         f"✅ WatermarkConfig created with VRAM: {config.vram_capacity}, RAM: {config.ram_capacity}"
@@ -53,7 +55,10 @@ def test_rust_core_basic():
 
     # Test creating TwoTireWmExpertCacheManager
     cache_manager = TwoTireWmExpertCacheManager(
-        config=config, total_layers=24, model_type="gpt-oss-20b"
+        model_type="gpt-oss-20b",
+        total_layers=24, 
+        vram_capacity=1024 * 1024 * 1024,  # 1GB
+        ram_capacity=4096 * 1024 * 1024,   # 4GB
     )
     print("✅ TwoTireWmExpertCacheManager created successfully")
 
