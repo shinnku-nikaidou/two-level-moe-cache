@@ -6,12 +6,8 @@
 //! 2. Watermark updates: λ_G ← [λ_G + η_G(usage - K_G)]_+, λ_R ← [λ_R + η_R(usage - K_R)]_+
 //! 3. Cache decisions: Keep in tier iff b >= λ
 
-use super::config::WatermarkConfig;
-use super::error::WatermarkError;
-use crate::AbstractExpert;
 use crate::constants::ModelType;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Cache decision for an expert
 #[derive(Debug, Clone, PartialEq)]
@@ -38,13 +34,67 @@ pub enum MemoryTier {
     Disk = 2, // NVMe/SSD storage - slower, largest capacity
 }
 
+pub struct ExpertState {
+    inner: Vec<Vec<MemoryTier>>, // [layer][expert_idx] -> MemoryTier
+}
+
+impl ExpertState {
+    /// Create a new ExpertState with given dimensions
+    pub fn new(num_layers: usize, num_experts: usize) -> Self {
+        let inner = vec![vec![MemoryTier::Disk; num_experts]; num_layers];
+        Self { inner }
+    }
+
+    pub fn with_model(model_type: ModelType) -> Self {
+        let config: crate::constants::ModelConfig = model_type.into();
+        Self::new(config.total_layers, config.experts_per_layer)
+    }
+
+    /// Get memory tier for specific expert-layer pair
+    pub fn get(&self, layer_id: usize, expert_id: usize) -> MemoryTier {
+        self.inner[layer_id][expert_id]
+    }
+
+    /// Set memory tier for specific expert-layer pair
+    pub fn set(&mut self, layer_id: usize, expert_id: usize, tier: MemoryTier) {
+        if layer_id < self.inner.len() && expert_id < self.inner[layer_id].len() {
+            self.inner[layer_id][expert_id] = tier;
+        }
+    }
+}
+
 /// Dual watermark algorithm implementation  
 ///
 /// Manages two-tier expert caching using benefit density and adaptive watermarks.
 /// Receives fused probabilities and produces cache decisions based on watermark thresholds.
 pub struct WatermarkAlgorithm {
-    /// Configuration parameters
-    config: WatermarkConfig,
+    /// Model type for determining expert layout
+    model_type: ModelType,
+
+    /// VRAM capacity in bytes (K_G)
+    #[allow(dead_code)]
+    vram_capacity: usize,
+
+    /// RAM capacity in bytes (K_R)  
+    #[allow(dead_code)]
+    ram_capacity: usize,
+
+    /// VRAM watermark learning rate (η_G)
+    #[allow(dead_code)]
+    vram_learning_rate: f64,
+
+    /// RAM watermark learning rate (η_R)
+    #[allow(dead_code)]
+    ram_learning_rate: f64,
+
+    /// Cost of promoting expert from RAM to VRAM (C^G)
+    cost_g: f64,
+
+    /// Cost of loading expert from NVMe to RAM (C^R)  
+    cost_r: f64,
+
+    /// Expert size in bytes (all experts assumed to have same size)
+    expert_size: usize,
 
     /// Current watermark values (λ_G, λ_R)
     vram_watermark: f64,
@@ -52,28 +102,33 @@ pub struct WatermarkAlgorithm {
 
     /// Current time step
     current_time: u64,
-
-    /// Expert memory tier tracking
-    expert_states: HashMap<AbstractExpert, MemoryTier>,
-
-    /// Current memory usage
-    vram_used_bytes: usize,
-    ram_used_bytes: usize,
 }
 
 impl WatermarkAlgorithm {
     /// Create a new watermark algorithm instance
-    pub fn new(config: WatermarkConfig) -> Self {
-        config.validate().expect("Invalid watermark configuration");
-
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        model_type: ModelType,
+        vram_capacity: usize,
+        ram_capacity: usize,
+        vram_learning_rate: f64,
+        ram_learning_rate: f64,
+        cost_g: f64,
+        cost_r: f64,
+        expert_size: usize,
+    ) -> Self {
         Self {
-            config,
+            model_type,
+            vram_capacity,
+            ram_capacity,
+            vram_learning_rate,
+            ram_learning_rate,
+            cost_g,
+            cost_r,
+            expert_size,
             vram_watermark: 0.0,
             ram_watermark: 0.0,
             current_time: 0,
-            expert_states: HashMap::new(),
-            vram_used_bytes: 0,
-            ram_used_bytes: 0,
         }
     }
 
@@ -83,8 +138,22 @@ impl WatermarkAlgorithm {
         vram_capacity_mb: usize,
         ram_capacity_mb: usize,
     ) -> Self {
-        let config = WatermarkConfig::from_model(model_type, vram_capacity_mb, ram_capacity_mb);
-        Self::new(config)
+        let (vram_lr, ram_lr) = match model_type {
+            ModelType::GptOss20B => (0.01, 0.01),
+            ModelType::GptOss120B => (0.005, 0.005),
+            ModelType::PhiTinyMoe => (0.01, 0.01),
+        };
+
+        Self::new(
+            model_type,
+            vram_capacity_mb * 1024 * 1024,
+            ram_capacity_mb * 1024 * 1024,
+            vram_lr,
+            ram_lr,
+            1.0,         // cost_g: RAM to VRAM cost
+            10.0,        // cost_r: NVMe to RAM cost
+            1024 * 1024, // expert_size: 1MB default
+        )
     }
 
     /// Advance to next time step and update watermarks
@@ -101,141 +170,66 @@ impl WatermarkAlgorithm {
     /// - Generate appropriate cache decisions
     pub fn make_cache_decisions(
         &mut self,
-        fused_probabilities: &HashMap<AbstractExpert, f64>,
-    ) -> Result<HashMap<AbstractExpert, CacheDecision>, WatermarkError> {
-        let mut decisions = HashMap::new();
+        fused_probabilities: &crate::ExpertProbability,
+    ) -> ExpertState {
+        // Create output state based on model configuration
+        let model_config: crate::constants::ModelConfig = self.model_type.into();
+        let mut expert_state =
+            ExpertState::new(model_config.total_layers, model_config.experts_per_layer);
 
-        for (expert, &probability) in fused_probabilities {
-            // Validate probability
-            if !(0.0..=1.0).contains(&probability) {
-                return Err(WatermarkError::InvalidProbability {
-                    expert_key: format!("{:?}", expert),
-                    probability,
-                });
+        // Process each layer
+        for layer_id in 0..model_config.total_layers {
+            for expert_id in 0..model_config.experts_per_layer {
+                // Get fused probability for this expert
+                let probability = fused_probabilities.get(layer_id, expert_id).unwrap_or(0.0);
+
+                // Validate probability
+                if !(0.0..=1.0).contains(&probability) {
+                    panic!(
+                        "Invalid probability {} for expert ({}, {})",
+                        probability, layer_id, expert_id
+                    );
+                }
+
+                // Calculate benefit densities using configuration
+                let size = self.expert_size as f64;
+                let vram_benefit = probability * self.cost_g / size;
+                let ram_benefit = probability * self.cost_r / size;
+
+                // Make cache decision based on watermarks
+                let tier = if vram_benefit >= self.vram_watermark {
+                    MemoryTier::Vram
+                } else if ram_benefit >= self.ram_watermark {
+                    MemoryTier::Ram
+                } else {
+                    MemoryTier::Disk
+                };
+
+                expert_state.set(layer_id, expert_id, tier);
             }
-
-            // Get or create expert state
-            let current_tier = {
-                let expert_tier = self.get_or_create_expert_tier(*expert);
-                *expert_tier
-            };
-
-            // Calculate benefit densities using configuration
-            let size = self.config.expert_size_bytes as f64;
-            let vram_benefit = probability * self.config.ram_to_vram_cost / size;
-            let ram_benefit = probability * self.config.nvme_to_ram_cost / size;
-
-            // Make cache decision based on current tier and watermarks
-            let decision = match current_tier {
-                MemoryTier::Vram => {
-                    if vram_benefit >= self.vram_watermark {
-                        CacheDecision::KeepInVRAM
-                    } else {
-                        CacheDecision::DemoteToRAM
-                    }
-                }
-                MemoryTier::Ram => {
-                    if ram_benefit >= self.ram_watermark {
-                        CacheDecision::KeepInRAM
-                    } else {
-                        CacheDecision::EvictToDisk
-                    }
-                }
-                MemoryTier::Disk => {
-                    if ram_benefit >= self.ram_watermark {
-                        CacheDecision::LoadToRAM
-                    } else {
-                        // Stay on disk
-                        continue;
-                    }
-                }
-            };
-
-            decisions.insert(*expert, decision);
         }
 
-        Ok(decisions)
+        expert_state
     }
 
     /// Update watermarks using subgradient method
     ///
     /// Implements: λ_G ← [λ_G + η_G(usage - K_G)]_+, λ_R ← [λ_R + η_R(usage - K_R)]_+
+    /// Note: Since we don't track actual memory usage, this is a simplified version
+    /// that just applies learning rate decay
     fn update_watermarks(&mut self) {
-        // VRAM watermark update
-        let vram_constraint = self.vram_used_bytes as f64 - self.config.vram_capacity as f64;
-        self.vram_watermark =
-            (self.vram_watermark + self.config.vram_learning_rate * vram_constraint).max(0.0);
+        // Simplified watermark updates without actual usage tracking
+        // In practice, this could be enhanced with feedback from the actual cache manager
 
-        // RAM watermark update
-        let ram_constraint = self.ram_used_bytes as f64 - self.config.ram_capacity as f64;
-        self.ram_watermark =
-            (self.ram_watermark + self.config.ram_learning_rate * ram_constraint).max(0.0);
-    }
-
-    /// Get or create expert tier for tracking
-    fn get_or_create_expert_tier(&mut self, expert: AbstractExpert) -> &mut MemoryTier {
-        self.expert_states.entry(expert).or_insert(MemoryTier::Disk)
-    }
-
-    /// Apply cache decision (for simulation/testing)
-    pub fn apply_decision(
-        &mut self,
-        expert: AbstractExpert,
-        decision: CacheDecision,
-    ) -> Result<(), WatermarkError> {
-        let expert_tier = self
-            .expert_states
-            .get_mut(&expert)
-            .ok_or_else(|| WatermarkError::ExpertNotFound(format!("{:?}", expert)))?;
-
-        let expert_size = self.config.expert_size_bytes;
-
-        match decision {
-            CacheDecision::PromoteToVRAM => {
-                if *expert_tier == MemoryTier::Ram {
-                    self.vram_used_bytes += expert_size;
-                    *expert_tier = MemoryTier::Vram;
-                }
-            }
-            CacheDecision::DemoteToRAM => {
-                if *expert_tier == MemoryTier::Vram {
-                    self.vram_used_bytes -= expert_size;
-                    *expert_tier = MemoryTier::Ram;
-                }
-            }
-            CacheDecision::LoadToRAM => {
-                if *expert_tier == MemoryTier::Disk {
-                    self.ram_used_bytes += expert_size;
-                    *expert_tier = MemoryTier::Ram;
-                }
-            }
-            CacheDecision::EvictToDisk => {
-                if *expert_tier == MemoryTier::Ram {
-                    self.ram_used_bytes -= expert_size;
-                    *expert_tier = MemoryTier::Disk;
-                }
-            }
-            CacheDecision::KeepInVRAM | CacheDecision::KeepInRAM => {
-                // No state change needed
-            }
-        }
-
-        Ok(())
+        // For now, we keep the watermarks static or apply simple decay
+        // Future enhancement: receive usage feedback from cache manager
+        self.vram_watermark = (self.vram_watermark * 0.99).max(0.0); // Small decay
+        self.ram_watermark = (self.ram_watermark * 0.99).max(0.0); // Small decay
     }
 
     /// Get current watermark values
     pub fn get_watermarks(&self) -> (f64, f64) {
         (self.vram_watermark, self.ram_watermark)
-    }
-
-    /// Get current memory usage
-    pub fn get_memory_usage(&self) -> (usize, usize) {
-        (self.vram_used_bytes, self.ram_used_bytes)
-    }
-
-    /// Get algorithm configuration
-    pub fn config(&self) -> &WatermarkConfig {
-        &self.config
     }
 
     /// Get current time
@@ -248,13 +242,5 @@ impl WatermarkAlgorithm {
         self.vram_watermark = 0.0;
         self.ram_watermark = 0.0;
         self.current_time = 0;
-        self.expert_states.clear();
-        self.vram_used_bytes = 0;
-        self.ram_used_bytes = 0;
-    }
-
-    /// Get reference to expert tiers for status reporting
-    pub fn expert_states(&self) -> &HashMap<AbstractExpert, MemoryTier> {
-        &self.expert_states
     }
 }

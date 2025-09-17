@@ -8,6 +8,9 @@ use crate::constants::ModelType;
 /// Configuration for dual watermark algorithm
 #[derive(Debug, Clone, PartialEq)]
 pub struct WatermarkConfig {
+    /// Model type for determining expert layout
+    pub model_type: ModelType,
+    
     /// VRAM capacity in bytes (K_G)
     pub vram_capacity: usize,
 
@@ -21,31 +24,33 @@ pub struct WatermarkConfig {
     pub ram_learning_rate: f64,
 
     /// Cost of promoting expert from RAM to VRAM (C^G)
-    pub ram_to_vram_cost: f64,
+    pub cost_g: f64,
 
     /// Cost of loading expert from NVMe to RAM (C^R)  
-    pub nvme_to_ram_cost: f64,
+    pub cost_r: f64,
 
-    /// Expert size in bytes (simplified - in practice would vary per expert)
-    pub expert_size_bytes: usize,
+    /// Expert size in bytes (all experts assumed to have same size)
+    pub expert_size: usize,
 }
 
 impl WatermarkConfig {
     /// Create a new watermark configuration
     pub fn new(
+        model_type: ModelType,
         vram_capacity: usize,
         ram_capacity: usize,
         vram_learning_rate: f64,
         ram_learning_rate: f64,
     ) -> Self {
         let config = Self {
+            model_type,
             vram_capacity,
             ram_capacity,
             vram_learning_rate,
             ram_learning_rate,
-            ram_to_vram_cost: 1.0, // Default cost values
-            nvme_to_ram_cost: 10.0,
-            expert_size_bytes: 1024 * 1024, // 1MB default
+            cost_g: 1.0, // Default cost values
+            cost_r: 10.0,
+            expert_size: 1024 * 1024, // 1MB default
         };
         config.validate().expect("Invalid watermark configuration");
         config
@@ -54,6 +59,7 @@ impl WatermarkConfig {
     /// Create configuration for GPT-OSS-20B model
     pub fn for_gptoss20b(vram_capacity_mb: usize, ram_capacity_mb: usize) -> Self {
         Self::new(
+            ModelType::GptOss20B,
             vram_capacity_mb * 1024 * 1024,
             ram_capacity_mb * 1024 * 1024,
             0.01, // Default learning rates
@@ -64,6 +70,7 @@ impl WatermarkConfig {
     /// Create configuration for GPT-OSS-120B model
     pub fn for_gptoss120b(vram_capacity_mb: usize, ram_capacity_mb: usize) -> Self {
         Self::new(
+            ModelType::GptOss120B,
             vram_capacity_mb * 1024 * 1024,
             ram_capacity_mb * 1024 * 1024,
             0.005,
@@ -119,19 +126,19 @@ impl WatermarkConfig {
             ));
         }
 
-        if self.ram_to_vram_cost <= 0.0 {
+        if self.cost_g <= 0.0 {
             return Err(WatermarkConfigError::InvalidCost(
                 "RAM to VRAM cost must be > 0".to_string(),
             ));
         }
 
-        if self.nvme_to_ram_cost <= 0.0 {
+        if self.cost_r <= 0.0 {
             return Err(WatermarkConfigError::InvalidCost(
                 "NVMe to RAM cost must be > 0".to_string(),
             ));
         }
 
-        if self.expert_size_bytes == 0 {
+        if self.expert_size == 0 {
             return Err(WatermarkConfigError::InvalidSize(
                 "Expert size cannot be 0".to_string(),
             ));

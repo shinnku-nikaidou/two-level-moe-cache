@@ -24,5 +24,4 @@
 //!    - Evict from tier if `benefit < watermark`
 
 pub mod algorithm;
-pub mod config;
 pub mod error;

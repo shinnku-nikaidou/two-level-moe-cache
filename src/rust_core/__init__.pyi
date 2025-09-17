@@ -40,28 +40,6 @@ class RustExpertKey:
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
 
-class RustWatermarkConfig:
-    """Configuration for watermark-based caching algorithm."""
-
-    def __init__(
-        self,
-        vram_capacity: int,
-        ram_capacity: int,
-        vram_learning_rate: Optional[float] = None,
-        ram_learning_rate: Optional[float] = None,
-        fusion_eta: Optional[float] = None,
-        reuse_decay_gamma: Optional[float] = None,
-    ) -> None: ...
-    @property
-    def vram_capacity(self) -> int: ...
-    @property
-    def ram_capacity(self) -> int: ...
-    @property
-    def vram_learning_rate(self) -> float: ...
-    @property
-    def ram_learning_rate(self) -> float: ...
-    def validate(self) -> None: ...
-
 class RustExpertStatus:
     """Expert status information."""
 

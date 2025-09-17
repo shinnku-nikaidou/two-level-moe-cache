@@ -1,13 +1,8 @@
 //! Error types for watermark algorithm operations
 
-pub use super::config::WatermarkConfigError;
-
 /// Error types for watermark algorithm operations
 #[derive(Debug, Clone, PartialEq)]
 pub enum WatermarkError {
-    /// Configuration error
-    Config(WatermarkConfigError),
-
     /// Invalid expert key
     InvalidExpertKey(String),
 
@@ -31,9 +26,6 @@ pub enum WatermarkError {
 impl std::fmt::Display for WatermarkError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            WatermarkError::Config(config_err) => {
-                write!(f, "Watermark configuration error: {}", config_err)
-            }
             WatermarkError::InvalidExpertKey(key) => {
                 write!(f, "Invalid expert key: {}", key)
             }
@@ -66,9 +58,3 @@ impl std::fmt::Display for WatermarkError {
 }
 
 impl std::error::Error for WatermarkError {}
-
-impl From<WatermarkConfigError> for WatermarkError {
-    fn from(config_error: WatermarkConfigError) -> Self {
-        WatermarkError::Config(config_error)
-    }
-}

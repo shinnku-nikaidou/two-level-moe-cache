@@ -99,10 +99,8 @@ class ExpertCacheFactory:
     def create_two_tire_wm_cache_manager(
         cls,
         model_type: ModelType,
-        vram_capacity_mb: int = 512,
-        ram_capacity_mb: int = 2048,
-        vram_learning_rate: float = 0.01,
-        ram_learning_rate: float = 0.01,
+        vram_capacity_mb: int = 5120,
+        ram_capacity_mb: int = 20480,
         **kwargs,
     ) -> IExpertCacheManager:
         """
@@ -126,7 +124,5 @@ class ExpertCacheFactory:
             model_type=model_type,
             vram_capacity_mb=vram_capacity_mb,
             ram_capacity_mb=ram_capacity_mb,
-            vram_learning_rate=vram_learning_rate,
-            ram_learning_rate=ram_learning_rate,
             **kwargs,
         )

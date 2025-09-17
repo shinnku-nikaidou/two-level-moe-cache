@@ -11,7 +11,7 @@ pub struct ModelConfig {
 }
 
 /// Python-compatible model type
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ModelType {
     GptOss20B,
     GptOss120B,

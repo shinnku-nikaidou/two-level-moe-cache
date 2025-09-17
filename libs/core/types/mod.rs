@@ -3,7 +3,6 @@
 //! This module provides conversions between Python types used in the domain layer
 //! and Rust types used in the core implementation.
 
-pub mod config;
 pub mod conversions;
 pub mod expert;
 pub mod memory;
