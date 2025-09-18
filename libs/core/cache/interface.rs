@@ -4,7 +4,12 @@
 //! for the TwoTireWmExpertCacheManager.
 
 use super::manager::RustTwoTireWmExpertCacheManager;
-use crate::types::{expert::RustExpertKey, model::RustModelType, status::RustExpertStatus};
+use crate::types::{
+    expert::{RustExpertKey, RustExpertParamType},
+    model::RustModelType,
+    status::RustExpertStatus,
+};
+use policy::watermark::algorithm::MemoryTier;
 use pyo3::prelude::*;
 
 /// Extension trait to add convenient error conversion methods
@@ -47,23 +52,9 @@ impl RustTwoTireWmExpertCacheManager {
             .update_layer_activations(&activated_experts)
             .py_context("EWMA update error")?;
 
-        // Step 2: Get predictions from both components
-        let ewma_predictions = self.ewma_predictor.get_probabilities();
-        let scoutgate_predictions = self.scoutgate_predictor.get_probabilities();
-
-        // Step 3: Fuse probabilities with forward-causal weights
-        let fused_predictions = self
-            .probability_fuser
-            .fuse(ewma_predictions, scoutgate_predictions)
-            .py_context("Probability fusion error")?;
-
-        // Step 4: Make cache decisions using watermark algorithm
-        // Note: Currently watermark_algorithm.make_cache_decisions() returns ExpertState,
-        // but we don't need to expose it through this interface since Python side
-        // will call experts_status() separately to get the current cache state.
-        let _cache_decisions = self
-            .watermark_algorithm
-            .make_cache_decisions(&fused_predictions);
+        self.scoutgate_predictor
+            .update_predictions()
+            .py_context("ScoutGate update error")?;
 
         Ok(())
     }
@@ -116,37 +107,43 @@ impl RustTwoTireWmExpertCacheManager {
             .watermark_algorithm
             .make_cache_decisions(&fused_predictions);
 
-        expert_state
-            .inner
-            .iter()
-            .enumerate()
-            .flat_map(|(layer_idx, layer_experts)| {
-                // Process all experts in current layer
-                layer_experts
-                    .iter()
-                    .enumerate()
-                    .flat_map(move |(expert_idx, &memory_tier)| {
-                        // Convert MemoryTier enum to u8 for Python interface
-                        let tier_u8 = match memory_tier {
-                            policy::watermark::algorithm::MemoryTier::Vram => 0,
-                            policy::watermark::algorithm::MemoryTier::Ram => 1,
-                            policy::watermark::algorithm::MemoryTier::Disk => 2,
-                        };
+        // Pre-allocate result vector with exact capacity
+        // Each layer × experts_per_layer × 4_param_types = total entries
+        let total_layers = expert_state.inner.len();
+        let experts_per_layer = if total_layers > 0 {
+            expert_state.inner[0].len()
+        } else {
+            panic!("No layers in expert state")
+        };
+        let total_entries = total_layers * experts_per_layer * 4;
+        let mut result = Vec::with_capacity(total_entries);
 
-                        // Generate status for all 4 parameter types per expert
-                        [
-                            crate::types::expert::RustExpertParamType::MLP1_WEIGHT,
-                            crate::types::expert::RustExpertParamType::MLP1_BIAS,
-                            crate::types::expert::RustExpertParamType::MLP2_WEIGHT,
-                            crate::types::expert::RustExpertParamType::MLP2_BIAS,
-                        ]
-                        .into_iter()
-                        .map(move |param_type| {
-                            let expert_key = RustExpertKey::new(layer_idx, expert_idx, param_type);
-                            RustExpertStatus::new(expert_key, tier_u8)
-                        })
-                    })
-            })
-            .collect()
+        // Parameter types for each expert (all 4 MLP parameters)
+        let param_types = [
+            RustExpertParamType::MLP1_WEIGHT,
+            RustExpertParamType::MLP1_BIAS,
+            RustExpertParamType::MLP2_WEIGHT,
+            RustExpertParamType::MLP2_BIAS,
+        ];
+
+        // Simple nested loops for clear logic
+        for (layer_idx, layer_experts) in expert_state.inner.iter().enumerate() {
+            for (expert_idx, &memory_tier) in layer_experts.iter().enumerate() {
+                // Convert MemoryTier enum to u8 for Python interface
+                let tier_u8 = match memory_tier {
+                    MemoryTier::Vram => 0,
+                    MemoryTier::Ram => 1,
+                    MemoryTier::Disk => 2,
+                };
+
+                // Generate status for all 4 parameter types per expert
+                for param_type in param_types {
+                    let expert_key = RustExpertKey::new(layer_idx, expert_idx, param_type);
+                    result.push(RustExpertStatus::new(expert_key, tier_u8));
+                }
+            }
+        }
+
+        result
     }
 }

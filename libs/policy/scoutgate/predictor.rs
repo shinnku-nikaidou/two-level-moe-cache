@@ -55,15 +55,8 @@ impl ScoutGatePredictor {
         config.validate().expect("Invalid ScoutGate configuration");
 
         // Create predictions matrix and initialize all values to 1.0 as placeholder
-        let mut predictions =
+        let predictions =
             ExpertProbability::new(model_config.total_layers, model_config.experts_per_layer);
-
-        // Set all prediction values to 1.0 as placeholder implementation
-        for layer_id in 0..model_config.total_layers {
-            for expert_id in 0..model_config.experts_per_layer {
-                predictions.set(layer_id, expert_id, 1.0);
-            }
-        }
 
         ScoutGatePredictor {
             timer,
@@ -72,6 +65,17 @@ impl ScoutGatePredictor {
             predictions,
             token_context: Vec::new(),
         }
+    }
+
+    pub fn update_predictions(&mut self) -> Result<(), ScoutGateError> {
+        let model_config = &self.model_config;
+        // Set all prediction values to 1.0 as placeholder implementation
+        for layer_id in 0..model_config.total_layers {
+            for expert_id in 0..model_config.experts_per_layer {
+                self.predictions.set(layer_id, expert_id, 1.0);
+            }
+        }
+        Ok(())
     }
 
     /// Create ScoutGate predictor from model type

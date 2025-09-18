@@ -132,14 +132,4 @@ impl ProbabilityFusion {
     pub fn calculate_causal_weight(&self, reuse_distance: usize) -> f64 {
         (-self.gamma * reuse_distance as f64).exp()
     }
-
-    /// Get eta parameter (EWMA-ScoutGate blending factor)
-    pub fn eta(&self) -> f64 {
-        self.eta
-    }
-
-    /// Get gamma parameter (reuse distance decay factor)
-    pub fn gamma(&self) -> f64 {
-        self.gamma
-    }
 }
