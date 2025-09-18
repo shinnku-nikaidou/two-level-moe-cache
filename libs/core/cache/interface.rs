@@ -19,8 +19,8 @@ impl RustTwoTierWmExpertCacheManager {
     #[new]
     pub fn py_new(
         model_type: RustModelType,
-        vram_capacity: usize,
-        ram_capacity: usize,
+        vram_capacity: f64,
+        ram_capacity: f64,
     ) -> PyResult<Self> {
         Self::new(model_type, vram_capacity, ram_capacity)
             .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)

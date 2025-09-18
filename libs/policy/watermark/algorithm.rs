@@ -14,7 +14,7 @@
 //! Where:
 //! - `p^{fuse}_{e,ℓ}(t)`: Fused probability of expert activation
 //! - `C^G_{e,ℓ}`, `C^R_{e,ℓ}`: Access costs for VRAM and RAM tiers
-//! - `S_{e,ℓ}`: Expert size in bytes
+//! - `S_{e,ℓ}`: Expert size in MB
 //!
 //! ## 2. Watermark Updates (Subgradient Method)
 //! Watermarks evolve according to the dual optimization formulation:
@@ -24,8 +24,8 @@
 //! Where:
 //! - `λ_G`, `λ_R`: Current watermark thresholds for VRAM and RAM
 //! - `η_G`, `η_R`: Learning rates (step sizes) for watermark updates
-//! - `usage_G`, `usage_R`: Current memory usage in bytes
-//! - `K_G`, `K_R`: Capacity limits in bytes
+//! - `usage_G`, `usage_R`: Current memory usage in MB
+//! - `K_G`, `K_R`: Capacity limits in MB
 //! - `[z]_+ := max(z, 0)`: Non-negative projection (ReLU)
 //!
 //! ## 3. Cache Decisions
@@ -192,7 +192,7 @@ impl ExpertState {
 /// Where:
 /// - `p^{fuse}`: Fused probability from EWMA + ScoutGate predictors
 /// - `C^T`: Cost of accessing tier T (loading latency)
-/// - `S`: Expert size in bytes
+/// - `S`: Expert size in MB
 ///
 /// ## Watermark Evolution
 /// Watermarks evolve via projected subgradient descent:
@@ -207,13 +207,13 @@ impl ExpertState {
 /// - **Capacity-Aware**: Respects hard memory constraints
 /// - **Benefit-Driven**: Prioritizes high-value experts for faster tiers
 pub struct WatermarkAlgorithm {
-    /// VRAM capacity in bytes (K_G in mathematical notation)
+    /// VRAM capacity in MB (K_G in mathematical notation)
     /// Represents the total GPU memory available for expert caching
-    vram_capacity: usize,
+    vram_capacity: f64,
 
-    /// RAM capacity in bytes (K_R in mathematical notation)  
+    /// RAM capacity in MB (K_R in mathematical notation)  
     /// Represents the total system memory available for expert caching
-    ram_capacity: usize,
+    ram_capacity: f64,
 
     /// VRAM watermark learning rate (η_G in mathematical notation)
     /// Controls the speed of watermark adaptation for GPU memory tier
@@ -235,10 +235,10 @@ pub struct WatermarkAlgorithm {
     /// Should be higher than cost_g to reflect the storage hierarchy
     cost_r: f64,
 
-    /// Expert size in bytes (S_{e,ℓ} in mathematical notation)
+    /// Expert size in MB (S_{e,ℓ} in mathematical notation)
     /// Assumes all experts have uniform size for simplicity
     /// Real implementations may use per-expert sizes
-    expert_size: usize,
+    expert_size: f64,
 
     /// Current VRAM watermark threshold (λ_G in mathematical notation)
     /// Experts with benefit density ≥ this value are placed in VRAM
@@ -258,24 +258,24 @@ impl WatermarkAlgorithm {
     /// Use `from_model()` for model-specific default configurations.
     ///
     /// # Arguments
-    /// * `vram_capacity` - Total VRAM available for caching (bytes)
-    /// * `ram_capacity` - Total RAM available for caching (bytes)  
+    /// * `vram_capacity` - Total VRAM available for caching (MB)
+    /// * `ram_capacity` - Total RAM available for caching (MB)  
     /// * `vram_learning_rate` - Watermark adaptation speed for VRAM (η_G)
     /// * `ram_learning_rate` - Watermark adaptation speed for RAM (η_R)
     /// * `cost_g` - Cost of RAM→VRAM transfer (C^G)
     /// * `cost_r` - Cost of Disk→RAM transfer (C^R)  
-    /// * `expert_size` - Uniform expert size in bytes
+    /// * `expert_size` - Uniform expert size in MB
     ///
     /// # Returns
     /// New algorithm instance with watermarks initialized to 0.0
     pub fn new(
-        vram_capacity: usize,
-        ram_capacity: usize,
+        vram_capacity: f64,
+        ram_capacity: f64,
         vram_learning_rate: f64,
         ram_learning_rate: f64,
         cost_g: f64,
         cost_r: f64,
-        expert_size: usize,
+        expert_size: f64,
     ) -> Self {
         Self {
             vram_capacity,
@@ -296,23 +296,44 @@ impl WatermarkAlgorithm {
     /// MoE model architectures. Learning rates and costs are tuned based on
     /// empirical performance on each model type.
     ///
+    /// # Critical Insight: Cost-Size Proportionality
+    ///
+    /// **Why cost_g and cost_r must be proportional to expert_size:**
+    ///
+    /// The watermark algorithm compares benefit densities:
+    /// ```
+    /// b^G = (p_fuse × C^G) / S     // VRAM benefit per byte
+    /// b^R = (p_fuse × C^R) / S     // RAM benefit per byte
+    /// ```
+    ///
+    /// For this comparison to be meaningful, the costs C^G and C^R must reflect
+    /// the **actual transfer latency**, which is proportional to data size:
+    ///
+    /// - **C^G (RAM→VRAM)**: PCIe bandwidth is ~16-32 GB/s, so transfer time ∝ expert_size
+    /// - **C^R (Disk→RAM)**: NVMe bandwidth is ~3-7 GB/s, so transfer time ∝ expert_size
+    ///
+    /// If costs were constants (independent of size), the algorithm would incorrectly:
+    /// - Prefer smaller experts even when larger ones have higher activation probability
+    /// - Make suboptimal decisions because benefit density wouldn't reflect true cost/benefit
+    ///
+    /// **Mathematical justification from the paper:**
+    /// The benefit density formula `b = (p×C)/S` is designed to compute "value per byte".
+    /// For this to work, C must represent the actual cost of transferring S MB.
+    /// Since transfer cost = bandwidth_latency × size, we need C ∝ S for correct normalization.
+    ///
     /// # Arguments
     /// * `model_type` - The MoE model architecture
-    /// * `vram_capacity_mb` - VRAM capacity in megabytes
-    /// * `ram_capacity_mb` - RAM capacity in megabytes
+    /// * `vram_capacity` - VRAM capacity in MB
+    /// * `ram_capacity` - RAM capacity in MB
     ///
     /// # Default Parameters by Model
     /// - **GPT-OSS-20B**: η=0.01 (balanced adaptation)
     /// - **GPT-OSS-120B**: η=0.005 (slower adaptation for stability)
     /// - **Phi-Tiny-MoE**: η=0.01 (fast adaptation for small model)
     ///
-    /// Cost ratios: C^G=1.0, C^R=10.0 (reflects 10x latency difference)
+    /// Cost ratios: C^G=expert_size, C^R=expert_size (proportional to transfer latency)
     /// Expert size: Measured from actual model checkpoints
-    pub fn from_model(
-        model_type: ModelType,
-        vram_capacity_mb: usize,
-        ram_capacity_mb: usize,
-    ) -> Self {
+    pub fn from_model(model_type: ModelType, vram_capacity: f64, ram_capacity: f64) -> Self {
         // Model-specific learning rate tuning based on empirical results
         let (vram_lr, ram_lr) = match model_type {
             ModelType::GptOss20B => (0.01, 0.01),    // Balanced adaptation
@@ -320,20 +341,20 @@ impl WatermarkAlgorithm {
             ModelType::PhiTinyMoe => (0.01, 0.01),   // Fast for small model
         };
 
-        // Expert sizes measured from actual model checkpoints (bytes)
+        // Expert sizes measured from actual model checkpoints (MB)
         let expert_size = match model_type {
-            ModelType::GptOss20B => 52_923_244, // ~50.47 MB per expert (measured)
-            ModelType::GptOss120B => 100_000_000, // ~95.37 MB estimated (larger hidden/intermediate dims)
-            ModelType::PhiTinyMoe => 1_048_576,   // ~1 MB for tiny model
+            ModelType::GptOss20B => 50.47,  // ~50.47 MB per expert (measured)
+            ModelType::GptOss120B => 95.37, // ~95.37 MB estimated (larger hidden/intermediate dims)
+            ModelType::PhiTinyMoe => 1.0,   // ~1 MB for tiny model
         };
 
         Self::new(
-            vram_capacity_mb * 1024 * 1024, // Convert MB to bytes
-            ram_capacity_mb * 1024 * 1024,  // Convert MB to bytes
+            vram_capacity,
+            ram_capacity,
             vram_lr,
             ram_lr,
-            52923244.0, // cost_g: RAM→VRAM baseline cost
-            52923244.0, // cost_r: Disk→RAM cost
+            expert_size, // cost_g: RAM→VRAM transfer cost must be proportional to expert size
+            expert_size, // cost_r: Disk→RAM transfer cost must be proportional to expert size
             expert_size,
         )
     }
@@ -385,9 +406,8 @@ impl WatermarkAlgorithm {
         let mut inner = Vec::with_capacity(num_layers);
 
         // Precompute constants to avoid repeated calculations
-        let expert_size = self.expert_size as f64;
-        let vram_factor = self.cost_g / expert_size; // For b^G calculation
-        let ram_factor = self.cost_r / expert_size; // For b^R calculation
+        let vram_factor = self.cost_g / self.expert_size; // For b^G calculation
+        let ram_factor = self.cost_r / self.expert_size; // For b^R calculation
 
         // Simple nested loops for clear control flow
         for layer_probs in &fused_prob.inner {
@@ -475,7 +495,7 @@ impl WatermarkAlgorithm {
 
             // VRAM watermark update: λ_G ← [λ_G + η_G(usage_G - K_G)]₊
             let new_vram_watermark = (self.vram_watermark
-                + self.vram_learning_rate * (vram_usage as f64 - self.vram_capacity as f64))
+                + self.vram_learning_rate * (vram_usage - self.vram_capacity))
                 .max(0.0);
 
             self.vram_watermark = new_vram_watermark;
@@ -495,7 +515,7 @@ impl WatermarkAlgorithm {
 
             // RAM watermark update: λ_R ← [λ_R + η_R(usage_R - K_R)]₊
             let new_ram_watermark = (self.ram_watermark
-                + self.ram_learning_rate * (ram_usage as f64 - self.ram_capacity as f64))
+                + self.ram_learning_rate * (ram_usage - self.ram_capacity))
                 .max(0.0);
 
             self.ram_watermark = new_ram_watermark;
@@ -542,7 +562,7 @@ impl WatermarkAlgorithm {
     /// * `expert_state` - Complete tier assignment matrix for all experts
     ///
     /// # Returns
-    /// Tuple `(vram_bytes, ram_bytes)` representing total memory consumption
+    /// Tuple `(vram_mb, ram_mb)` representing total memory consumption in MB
     ///
     /// # Performance
     /// * Time complexity: O(L × E) - must examine every expert  
@@ -553,12 +573,12 @@ impl WatermarkAlgorithm {
     /// // Model with 2 layers, 3 experts per layer
     /// // Expert assignments: [VRAM, RAM, DISK], [RAM, DISK, VRAM]
     /// let (vram, ram) = alg.calculate_tier_usage(&state);
-    /// // vram = 2 * expert_size  (2 VRAM experts)
-    /// // ram = 4 * expert_size   (2 VRAM + 2 RAM experts)  
+    /// // vram = 2 * expert_size_mb  (2 VRAM experts)
+    /// // ram = 4 * expert_size_mb   (2 VRAM + 2 RAM experts)  
     /// ```
-    fn calculate_tier_usage(&self, expert_state: &ExpertState) -> (usize, usize) {
-        let mut vram_usage = 0; // Total VRAM consumption
-        let mut ram_usage = 0; // Total RAM consumption
+    fn calculate_tier_usage(&self, expert_state: &ExpertState) -> (f64, f64) {
+        let mut vram_usage = 0.0; // Total VRAM consumption (MB)
+        let mut ram_usage = 0.0; // Total RAM consumption (MB)
 
         // Iterate through all layers and experts to sum memory usage
         for layer_experts in &expert_state.inner {
@@ -581,7 +601,7 @@ impl WatermarkAlgorithm {
             }
         }
         debug!(
-            "Calculated tier usage: VRAM = {} bytes, RAM = {} bytes",
+            "Calculated tier usage: VRAM = {:.2} MB, RAM = {:.2} MB",
             vram_usage, ram_usage
         );
         (vram_usage, ram_usage)

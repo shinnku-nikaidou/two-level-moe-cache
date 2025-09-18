@@ -15,8 +15,8 @@ pub enum WatermarkError {
     /// Capacity constraint violation
     CapacityViolation {
         tier: String,
-        required: usize,
-        available: usize,
+        required: f64,    // Changed to f64 for MB units
+        available: f64,   // Changed to f64 for MB units
     },
 
     /// Expert not found in tracking state
@@ -46,7 +46,7 @@ impl std::fmt::Display for WatermarkError {
             } => {
                 write!(
                     f,
-                    "Capacity violation in {}: required {} bytes, available {} bytes",
+                    "Capacity violation in {}: required {:.2} MB, available {:.2} MB",
                     tier, required, available
                 )
             }

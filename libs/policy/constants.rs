@@ -31,20 +31,20 @@ impl From<ModelType> for ModelConfig {
 // GPT-OSS model series configurations
 pub const GPT_OSS_20B: ModelConfig = ModelConfig {
     name: "gpt-oss-20b",
-    total_layers: 24,     // num_hidden_layers from config.json
+    total_layers: 24,      // num_hidden_layers from config.json
     experts_per_layer: 32, // num_local_experts from config.json
 };
 
 pub const GPT_OSS_120B: ModelConfig = ModelConfig {
     name: "gpt-oss-120b",
-    total_layers: 36,      // num_hidden_layers from config.json
+    total_layers: 36,       // num_hidden_layers from config.json
     experts_per_layer: 128, // num_local_experts from config.json
 };
 
 // Phi-Tiny-MoE configuration (for testing)
 pub const PHI_TINY_MOE: ModelConfig = ModelConfig {
     name: "phi-tiny-moe",
-    total_layers: 32,  // num_hidden_layers from config.json
+    total_layers: 32,      // num_hidden_layers from config.json
     experts_per_layer: 16, // num_local_experts from config.json
 };
 

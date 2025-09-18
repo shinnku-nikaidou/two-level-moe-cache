@@ -52,8 +52,8 @@ impl RustTwoTierWmExpertCacheManager {
     /// # Arguments
     ///
     /// * `model_type` - The type of MoE model to manage (e.g., GptOss20B, GptOss120B)
-    /// * `vram_capacity` - VRAM cache capacity in number of expert parameters
-    /// * `ram_capacity` - RAM cache capacity in number of expert parameters
+    /// * `vram_capacity` - VRAM cache capacity in MB
+    /// * `ram_capacity` - RAM cache capacity in MB
     ///
     /// # Returns
     ///
@@ -71,8 +71,8 @@ impl RustTwoTierWmExpertCacheManager {
     #[instrument(level = "info", name = "cache_manager_new")]
     pub fn new(
         model_type: RustModelType,
-        vram_capacity: usize,
-        ram_capacity: usize,
+        vram_capacity: f64,
+        ram_capacity: f64,
     ) -> Result<Self, String> {
         info!(
             ?model_type,

@@ -28,8 +28,7 @@ fn init_logging() -> PyResult<()> {
     TRACING_INIT.call_once(|| {
         let subscriber = FmtSubscriber::builder()
             .with_env_filter(
-                EnvFilter::try_from_default_env()
-                    .unwrap_or_else(|_| EnvFilter::new("info"))
+                EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
             )
             .with_target(true)
             .with_thread_ids(false)
@@ -40,7 +39,7 @@ fn init_logging() -> PyResult<()> {
         tracing::subscriber::set_global_default(subscriber)
             .expect("Failed to set tracing subscriber");
     });
-    
+
     Ok(())
 }
 
@@ -50,10 +49,10 @@ fn init_logging() -> PyResult<()> {
 pub fn core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Initialize logging when module is imported
     init_logging()?;
-    
+
     // Export logging initialization function for manual control
     m.add_function(wrap_pyfunction!(init_logging, m)?)?;
-    
+
     // New two-tier watermark cache types
     m.add_class::<types::memory::RustMemoryTier>()?;
     m.add_class::<types::expert::RustExpertKey>()?;
