@@ -305,7 +305,7 @@ impl WatermarkAlgorithm {
     /// - **Phi-Tiny-MoE**: η=0.01 (fast adaptation for small model)
     ///
     /// Cost ratios: C^G=1.0, C^R=10.0 (reflects 10x latency difference)
-    /// Expert size: 1MB default (typical for MLP layers)
+    /// Expert size: Measured from actual model checkpoints
     pub fn from_model(
         model_type: ModelType,
         vram_capacity_mb: usize,
@@ -318,14 +318,21 @@ impl WatermarkAlgorithm {
             ModelType::PhiTinyMoe => (0.01, 0.01),   // Fast for small model
         };
 
+        // Expert sizes measured from actual model checkpoints (bytes)
+        let expert_size_bytes = match model_type {
+            ModelType::GptOss20B => 52_923_244, // ~50.47 MB per expert (measured)
+            ModelType::GptOss120B => 100_000_000, // ~95.37 MB estimated (larger hidden/intermediate dims)
+            ModelType::PhiTinyMoe => 1_048_576,   // ~1 MB for tiny model
+        };
+
         Self::new(
             vram_capacity_mb * 1024 * 1024, // Convert MB to bytes
             ram_capacity_mb * 1024 * 1024,  // Convert MB to bytes
             vram_lr,
             ram_lr,
-            1.0,         // cost_g: RAM→VRAM baseline cost
-            10.0,        // cost_r: Disk→RAM is ~10x slower than RAM→VRAM
-            1024 * 1024, // expert_size: 1MB typical MLP layer size
+            1.0,  // cost_g: RAM→VRAM baseline cost
+            10.0, // cost_r: Disk→RAM is ~10x slower than RAM→VRAM
+            expert_size_bytes,
         )
     }
 
