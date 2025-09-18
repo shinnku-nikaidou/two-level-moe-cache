@@ -35,7 +35,7 @@ impl ProbabilityFusion {
 
     /// Create fusion predictor from model type
     pub fn from_model(_model_type: crate::constants::ModelType, timer: Arc<RwLock<Timer>>) -> Self {
-        Self::new(0.5, 0.1, timer)
+        Self::new(0.0, 0.05, timer)
     }
 
     /// Fuse EWMA and ScoutGate predictions with forward-causal weights
@@ -57,40 +57,37 @@ impl ProbabilityFusion {
         scoutgate_predictions: &crate::ExpertProbability,
     ) -> Result<crate::ExpertProbability, FusionError> {
         // Create output ExpertProbability with same dimensions as inputs
-        // Assume all Vec<Vec<T>> structures have identical dimensions
         let mut result = crate::ExpertProbability::new(
             ewma_predictions.inner.len(),
             ewma_predictions.inner[0].len(),
         );
 
-        // Process each layer and expert pair
-        for (layer_id, (ewma_layer, scoutgate_layer)) in ewma_predictions
-            .inner
-            .iter()
-            .zip(scoutgate_predictions.inner.iter())
-            .enumerate()
-        {
-            for (expert_id, (ewma_prob_opt, scoutgate_prob_opt)) in
-                ewma_layer.iter().zip(scoutgate_layer.iter()).enumerate()
-            {
-                // Extract probability values, default to 0.0 if None
-                let ewma_prob = ewma_prob_opt.unwrap_or(0.0);
-                let scoutgate_prob = scoutgate_prob_opt.unwrap_or(0.0);
+        // Cache input references for cleaner access
+        let ewma_prob = &ewma_predictions.inner;
+        let sg_prob = &scoutgate_predictions.inner;
 
-                // Step 1: Base fusion
-                // p^{base}_{e,ℓ}(t) := (1-η)·p̂^{EWMA}_{e,ℓ}(t) + η·p̂^{SG}_{e,ℓ}(t)
-                let base_prob = (1.0 - self.eta) * ewma_prob + self.eta * scoutgate_prob;
-
-                // Step 2: Calculate forward-causal weight
-                // W(ℓ|ℓ(t)) := e^{-γ·D(ℓ|ℓ(t))}
+        // Pre-calculate causal weights for all layers to optimize performance
+        let causal_weights: Vec<f64> = (0..ewma_prob.len())
+            .map(|layer_id| {
                 let reuse_distance = self.calculate_reuse_distance(layer_id);
-                let causal_weight = self.calculate_causal_weight(reuse_distance);
+                self.calculate_causal_weight(reuse_distance)
+            })
+            .collect();
 
-                // Step 3: Final fusion
-                // p^{fuse}_{e,ℓ}(t) := p^{base}_{e,ℓ}(t) · W(ℓ|ℓ(t))
-                let fused_prob = base_prob * causal_weight;
+        // Elegant fusion: iterate through layers with pre-computed weights
+        for (layer_id, causal_weight) in causal_weights.iter().enumerate() {
+            let ewma_layer = &ewma_prob[layer_id];
+            let sg_layer = &sg_prob[layer_id];
 
-                // Store result in output structure
+            // Process all experts in current layer with vectorized approach
+            for expert_id in 0..ewma_layer.len() {
+                let ewma_val = ewma_layer[expert_id].unwrap_or(0.0);
+                let sg_val = sg_layer[expert_id].unwrap_or(0.0);
+
+                // Single-step fusion: base fusion + causal weighting
+                // p^{fuse}_{e,ℓ}(t) = [(1-η)·p̂^{EWMA} + η·p̂^{SG}] · W(ℓ|ℓ(t))
+                let fused_prob = ((1.0 - self.eta) * ewma_val + self.eta * sg_val) * causal_weight;
+
                 result.set(layer_id, expert_id, fused_prob);
             }
         }
