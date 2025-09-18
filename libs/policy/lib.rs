@@ -10,6 +10,7 @@ pub mod watermark;
 pub type Probability = Option<f64>; // Probability values in [0.0, 1.0]
 
 // Probability map per expert per layer
+#[derive(Debug, Clone, PartialEq)]
 pub struct ExpertProbability {
     pub inner: Vec<Vec<Probability>>,
 }

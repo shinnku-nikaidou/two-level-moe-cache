@@ -40,13 +40,25 @@ impl RustTwoTierWmExpertCacheManager {
         self.current_activated_experts = activated_experts.clone();
 
         // Step 1: Update EWMA predictor with current layer activations
-        self.ewma_predictor
+        self.ewma
             .update_layer_activations(&activated_experts)
             .py_context("EWMA update error")?;
 
-        self.scoutgate_predictor
+        self.scoutgate
             .update_predictions()
             .py_context("ScoutGate update error")?;
+
+        // Step 2: Fuse predictions and update watermarks
+        let fused_predictions = self
+            .fuser
+            .fuse(
+                self.ewma.get_probabilities(),
+                self.scoutgate.get_probabilities(),
+            )
+            .py_context("Probability fusion error")?;
+
+        // Step 3: Update watermark thresholds based on new predictions
+        self.watermark.update_watermarks(&fused_predictions);
 
         Ok(())
     }
@@ -61,7 +73,7 @@ impl RustTwoTierWmExpertCacheManager {
 
         // TODO: In a real implementation, this would receive the actual token from the inference context
         let placeholder_token = 0u32; // Placeholder - should come from actual token stream
-        self.scoutgate_predictor
+        self.scoutgate
             .update_token_context(placeholder_token)
             .py_context("ScoutGate update error")?;
 
@@ -89,16 +101,16 @@ impl RustTwoTierWmExpertCacheManager {
     /// - IMPORTANT: Forcibly promotes currently activated experts to VRAM to ensure inference correctness
     pub fn experts_status(&self) -> Vec<RustExpertStatus> {
         let fused_predictions = self
-            .probability_fuser
+            .fuser
             .fuse(
-                self.ewma_predictor.get_probabilities(),
-                self.scoutgate_predictor.get_probabilities(),
+                self.ewma.get_probabilities(),
+                self.scoutgate.get_probabilities(),
             )
             .unwrap();
 
-        let mut expert_state = self
-            .watermark_algorithm
-            .make_cache_decisions(&fused_predictions);
+        info!("Fused predictions: {:?}", fused_predictions);
+
+        let mut expert_state = self.watermark.make_cache_decisions(&fused_predictions);
 
         // Get current layer from timer
         let current_layer = {
@@ -106,13 +118,21 @@ impl RustTwoTierWmExpertCacheManager {
             timer.current_layer()
         };
 
+        info!(
+            "current_activated_experts: {:?}",
+            self.current_activated_experts
+        );
+
         // Force currently activated experts to VRAM tier to ensure inference correctness
         // This overrides watermark algorithm decisions for experts that are actively needed
         for &expert_id in &self.current_activated_experts {
             expert_state.inner[current_layer][expert_id] = MemoryTier::Vram;
         }
 
-        info!("Expert state after forced VRAM placement: {:?}", expert_state);
+        info!(
+            "Expert state after forced VRAM placement: {:?}",
+            expert_state
+        );
 
         // Pre-allocate result vector with exact capacity
         // Each layer × experts_per_layer × 4_param_types = total entries

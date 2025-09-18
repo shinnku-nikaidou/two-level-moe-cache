@@ -15,6 +15,7 @@ use policy::{
 use pyo3::prelude::*;
 use std::sync::{Arc, RwLock};
 use tracing::{debug, info, instrument};
+
 /// Thin Python interface for the two-level MOE cache system
 ///
 /// This is the CORRECT architecture implementation:
@@ -25,16 +26,16 @@ pub struct RustTwoTierWmExpertCacheManager {
     pub(crate) timer: Arc<RwLock<Timer>>,
 
     /// EWMA predictor for expert activation probability estimation
-    pub(crate) ewma_predictor: EwmaPredictor,
+    pub(crate) ewma: EwmaPredictor,
 
     /// ScoutGate predictor for semantic-based expert activation prediction
-    pub(crate) scoutgate_predictor: ScoutGatePredictor,
+    pub(crate) scoutgate: ScoutGatePredictor,
 
     /// Probability fusion component
-    pub(crate) probability_fuser: ProbabilityFusion,
+    pub(crate) fuser: ProbabilityFusion,
 
     /// Watermark algorithm for cache decisions
-    pub(crate) watermark_algorithm: WatermarkAlgorithm,
+    pub(crate) watermark: WatermarkAlgorithm,
 
     /// Cache of currently activated experts for the current layer
     /// Used to force these experts to VRAM tier during experts_status() calls
@@ -95,28 +96,27 @@ impl RustTwoTierWmExpertCacheManager {
         let timer = Arc::new(RwLock::new(Timer::from_config(&config)));
 
         // Create EWMA predictor with shared timer reference
-        let ewma_predictor = EwmaPredictor::from_model(timer.clone(), model_type);
+        let ewma = EwmaPredictor::from_model(timer.clone(), model_type);
         debug!("EWMA predictor initialized");
 
         // Create ScoutGate predictor with shared timer reference
-        let scoutgate_predictor = ScoutGatePredictor::from_model(timer.clone(), model_type);
+        let scoutgate = ScoutGatePredictor::from_model(timer.clone(), model_type);
         debug!("ScoutGate predictor initialized");
 
         // Create probability fusion with shared timer reference
-        let probability_fuser = ProbabilityFusion::from_model(model_type, timer.clone());
+        let fuser = ProbabilityFusion::from_model(model_type, timer.clone());
         debug!("Probability fusion component initialized");
 
         // Create watermark algorithm
-        let watermark_algorithm =
-            WatermarkAlgorithm::from_model(model_type, vram_capacity, ram_capacity);
+        let watermark = WatermarkAlgorithm::from_model(model_type, vram_capacity, ram_capacity);
         debug!("Watermark algorithm initialized");
 
         Ok(Self {
             timer,
-            ewma_predictor,
-            scoutgate_predictor,
-            probability_fuser,
-            watermark_algorithm,
+            ewma,
+            scoutgate,
+            fuser,
+            watermark,
             current_activated_experts: Vec::new(),
         })
     }
