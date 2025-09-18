@@ -8,10 +8,10 @@
 //! This is a placeholder that returns 1.0 for any expert key. The full implementation
 //! would include token embedding, projection layers, two-tower architecture, etc.
 
-use crate::AbstractExpert;
+use crate::ExpertProbability;
 use crate::constants::{ModelConfig, ModelType};
 use crate::timer::Timer;
-use crate::{ExpertProbability, Probability};
+use std::sync::{Arc, RwLock};
 
 use super::config::ScoutGateConfig;
 use super::error::ScoutGateError;
@@ -26,9 +26,9 @@ use super::error::ScoutGateError;
 /// - Two-tower architecture for expert scoring
 /// - Context processing with recent m tokens
 /// - Sigmoid activation for probability outputs
-pub struct ScoutGatePredictor<'a> {
+pub struct ScoutGatePredictor {
     /// Shared timer for time step management (though ScoutGate provides global predictions)
-    timer: &'a Timer,
+    timer: Arc<RwLock<Timer>>,
 
     /// ScoutGate configuration parameters
     config: ScoutGateConfig,
@@ -41,12 +41,16 @@ pub struct ScoutGatePredictor<'a> {
 
     /// Placeholder for current token context
     /// In full implementation, this would store recent m tokens
-    _token_context: Vec<u32>,
+    token_context: Vec<u32>,
 }
 
-impl<'a> ScoutGatePredictor<'a> {
+impl ScoutGatePredictor {
     /// Create a new ScoutGate predictor with shared timer
-    pub fn new(timer: &'a Timer, model_config: ModelConfig, config: ScoutGateConfig) -> Self {
+    pub fn new(
+        timer: Arc<RwLock<Timer>>,
+        model_config: ModelConfig,
+        config: ScoutGateConfig,
+    ) -> Self {
         // Validate configuration - panic on failure
         config.validate().expect("Invalid ScoutGate configuration");
 
@@ -58,65 +62,48 @@ impl<'a> ScoutGatePredictor<'a> {
             config,
             model_config,
             predictions,
-            _token_context: Vec::new(),
+            token_context: Vec::new(),
         }
     }
 
     /// Create ScoutGate predictor from model type
-    pub fn from_model(timer: &'a Timer, model_type: ModelType) -> Self {
+    pub fn from_model(timer: Arc<RwLock<Timer>>, model_type: ModelType) -> Self {
         let model_config: ModelConfig = model_type.into();
         Self::new(timer, model_config, ScoutGateConfig::default())
     }
 
     /// Update token context with new token
     ///
-    /// **PLACEHOLDER**: In full implementation, this would:
-    /// 1. Add new token to context window
-    /// 2. Maintain sliding window of recent m tokens
-    /// 3. Trigger re-computation of predictions if needed
-    pub fn update_token_context(&mut self, _new_token: u32) -> Result<(), ScoutGateError> {
-        // Placeholder implementation - no actual processing
+    /// This method maintains a sliding window of the most recent m tokens for ScoutGate prediction.
+    /// When a new token is added:
+    /// 1. Add the token to the context window
+    /// 2. Maintain the window size by removing oldest tokens if needed
+    /// 3. In a full implementation, this would trigger re-computation of predictions
+    ///
+    /// # Arguments
+    /// * `new_token` - The new token ID to add to the context
+    ///
+    /// # Returns
+    /// * `Ok(())` if successful
+    /// * `Err(ScoutGateError)` if there's an error
+    pub fn update_token_context(&mut self, new_token: u32) -> Result<(), ScoutGateError> {
+        // Add the new token to the context
+        self.token_context.push(new_token);
+
+        // Maintain the sliding window size according to configuration
+        if self.token_context.len() > self.config.context_window_size {
+            // Remove the oldest token to maintain window size
+            self.token_context.remove(0);
+        }
+
+        // TODO: In full implementation, trigger re-computation of predictions here
+        // This would involve:
+        // 1. Token embedding lookup
+        // 2. Context processing through projection layers
+        // 3. Two-tower architecture computation
+        // 4. Probability computation for all expert-layer pairs
+
         Ok(())
-    }
-
-    /// Get activation probability prediction for a specific expert-layer pair
-    ///
-    /// **PLACEHOLDER**: Always returns 1.0
-    ///
-    /// In the full implementation, this would:
-    /// 1. Use recent token context for semantic analysis
-    /// 2. Apply token embedding and projection
-    /// 3. Combine with layer embeddings
-    /// 4. Use two-tower architecture to score expert
-    /// 5. Apply sigmoid activation for probability output
-    pub fn get_probability(&self, expert: AbstractExpert) -> f64 {
-        // Get from predictions storage, or return 1.0 if not set
-        self.predictions
-            .get(expert.layer_id, expert.expert_id)
-            .unwrap_or(1.0)
-    }
-
-    /// Get activation probability predictions for all experts in a specific layer
-    ///
-    /// **PLACEHOLDER**: Returns 1.0 for all experts
-    ///
-    /// This is the main interface that should output ŵp^{SG}_{e,ℓ}(t) ∈ [0,1]
-    /// for all experts e in layer ℓ at time t.
-    pub fn get_layer_probabilities(&self, layer_id: usize) -> Vec<Probability> {
-        // Validate layer_id
-        if layer_id >= self.model_config.total_layers {
-            // Return empty vector for invalid layer
-            return Vec::new();
-        }
-
-        // Generate probabilities for all experts in the layer
-        let mut layer_probs = Vec::with_capacity(self.model_config.experts_per_layer);
-        for expert_id in 0..self.model_config.experts_per_layer {
-            let prob = self.predictions.get(layer_id, expert_id);
-            layer_probs.push(prob);
-        }
-
-        layer_probs
     }
 
     /// Get activation probability predictions for all layers and experts
@@ -125,51 +112,71 @@ impl<'a> ScoutGatePredictor<'a> {
     ///
     /// This corresponds to the full ScoutGate output across all layers.
     /// In full implementation, this would be the main prediction method.
-    pub fn get_all_probabilities(&self) -> &ExpertProbability {
+    pub fn get_probabilities(&self) -> &ExpertProbability {
         &self.predictions
     }
 
-    /// Update prediction for a specific expert-layer pair
-    pub fn update_probability(&mut self, expert: AbstractExpert, probability: f64) {
-        self.predictions
-            .set(expert.layer_id, expert.expert_id, probability);
+    /// Get current token context window
+    ///
+    /// Returns a slice of the current token context, which contains
+    /// the most recent tokens up to the configured window size.
+    ///
+    /// # Returns
+    /// * `&[u32]` - Slice of current token context
+    pub fn get_token_context(&self) -> &[u32] {
+        &self.token_context
     }
 
-    /// Force prediction update/refresh
+    /// Get current context window size
     ///
-    /// **PLACEHOLDER**: No-op in placeholder implementation
-    ///
-    /// In full implementation, this would:
-    /// 1. Recompute embeddings for current context
-    /// 2. Update all layer predictions
-    /// 3. Cache results for efficiency
-    pub fn update_predictions(&mut self) -> Result<(), ScoutGateError> {
-        // Placeholder implementation - no actual computation
-        Ok(())
+    /// # Returns  
+    /// * `usize` - Current number of tokens in context
+    pub fn context_size(&self) -> usize {
+        self.token_context.len()
     }
 
-    /// Get current ScoutGate configuration
-    pub fn config(&self) -> &ScoutGateConfig {
-        &self.config
+    /// Check if context window is full
+    ///
+    /// # Returns
+    /// * `bool` - True if context window has reached maximum size
+    pub fn is_context_full(&self) -> bool {
+        self.token_context.len() >= self.config.context_window_size
+    }
+
+    /// Get current time step from timer
+    ///
+    /// # Returns
+    /// * `Result<u64, ScoutGateError>` - Current time step
+    pub fn current_time(&self) -> Result<u64, ScoutGateError> {
+        Ok(self.timer.read().unwrap().current_time())
+    }
+
+    /// Clear token context
+    ///
+    /// Removes all tokens from the context window. This might be useful
+    /// when starting a new sequence or resetting the predictor state.
+    pub fn clear_context(&mut self) {
+        self.token_context.clear();
     }
 
     /// Get model configuration
+    ///
+    /// Returns the model configuration used by this predictor, which includes
+    /// information about total layers and experts per layer.
+    ///
+    /// # Returns
+    /// * `&ModelConfig` - Reference to the model configuration
     pub fn model_config(&self) -> &ModelConfig {
         &self.model_config
     }
 
-    /// Get current global time step from shared timer
-    pub fn current_time_step(&self) -> Result<u64, ScoutGateError> {
-        Ok(self.timer.current_time())
-    }
-
-    /// Get context window size
-    pub fn context_window_size(&self) -> usize {
-        self.config.context_window_size
-    }
-
-    /// Clear internal state (reset predictions)
-    pub fn reset(&mut self) {
-        self._token_context.clear();
+    /// Get ScoutGate configuration
+    ///
+    /// Returns the ScoutGate-specific configuration parameters.
+    ///
+    /// # Returns
+    /// * `&ScoutGateConfig` - Reference to the ScoutGate configuration
+    pub fn scoutgate_config(&self) -> &ScoutGateConfig {
+        &self.config
     }
 }

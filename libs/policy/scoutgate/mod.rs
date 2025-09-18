@@ -45,4 +45,5 @@
 
 pub mod config;
 pub mod error;
+pub mod hyperparamater;
 pub mod predictor;

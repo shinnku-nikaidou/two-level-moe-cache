@@ -5,7 +5,6 @@
 
 use super::manager::RustTwoTireWmExpertCacheManager;
 use crate::types::{expert::RustExpertKey, model::RustModelType, status::RustExpertStatus};
-use policy::watermark::algorithm::MemoryTier;
 use pyo3::prelude::*;
 
 #[pymethods]
@@ -37,7 +36,8 @@ impl RustTwoTireWmExpertCacheManager {
 
     /// Advance to next time step
     pub fn step_forward(&mut self) -> PyResult<()> {
-        self.timer.step();
+        let mut timer = self.timer.write().unwrap();
+        timer.step();
         Ok(())
     }
 

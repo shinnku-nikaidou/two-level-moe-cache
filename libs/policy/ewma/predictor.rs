@@ -1,6 +1,7 @@
 use crate::constants::{ModelConfig, ModelType};
 use crate::timer::Timer;
 use crate::{AbstractExpert, ExpertProbability};
+use std::sync::{Arc, RwLock};
 
 use super::error::EwmaError;
 
@@ -9,9 +10,9 @@ use super::error::EwmaError;
 /// Implements the layer-local EWMA algorithm from the documentation using 0-based indexing.
 /// Maintains activation probability estimates for each expert-layer pair using exponential
 /// weighted moving averages with a shared Timer for layer-local clock management.
-pub struct EwmaPredictor<'a> {
+pub struct EwmaPredictor {
     /// Shared timer for layer-local time management
-    timer: &'a Timer,
+    timer: Arc<RwLock<Timer>>,
 
     /// EWMA smoothing parameter α ∈ (0,1]
     alpha: f64,
@@ -24,9 +25,13 @@ pub struct EwmaPredictor<'a> {
     ewma_values: ExpertProbability,
 }
 
-impl<'a> EwmaPredictor<'a> {
+impl EwmaPredictor {
     /// Create a new EWMA predictor with shared timer
-    pub fn new(timer: &'a Timer, config: ModelConfig, alpha: f64) -> Result<Self, EwmaError> {
+    pub fn new(
+        timer: Arc<RwLock<Timer>>,
+        config: ModelConfig,
+        alpha: f64,
+    ) -> Result<Self, EwmaError> {
         // Validate alpha parameter
         if alpha <= 0.0 || alpha > 1.0 {
             return Err(EwmaError::InvalidAlpha(alpha));
@@ -41,7 +46,7 @@ impl<'a> EwmaPredictor<'a> {
     }
 
     /// Create EWMA predictor from model type
-    pub fn from_model(timer: &'a Timer, model_type: ModelType) -> Self {
+    pub fn from_model(timer: Arc<RwLock<Timer>>, model_type: ModelType) -> Self {
         let config: ModelConfig = model_type.into();
         Self::new(timer, config, crate::constants::ALPHA)
             .expect("Default EWMA configuration should be valid")
@@ -58,7 +63,7 @@ impl<'a> EwmaPredictor<'a> {
         activated_experts: &[usize],
     ) -> Result<(), EwmaError> {
         // Get current layer from shared timer
-        let current_layer = self.timer.current_layer();
+        let current_layer = self.timer.read().unwrap().current_layer();
 
         // Get all possible experts for this layer
         let layer_experts =

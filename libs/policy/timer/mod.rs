@@ -1,6 +1,7 @@
 /// Simple timer for MoE layer execution tracking
 /// Maintains global time and provides layer-related calculations
 /// Uses 0-based indexing: time starts at 0, layers are 0..L-1
+#[derive(Clone)]
 pub struct Timer {
     current_time: u64,   // Current global time t (starts from 0)
     total_layers: usize, // Total number of layers L

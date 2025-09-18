@@ -68,12 +68,10 @@ impl ExpertState {
 /// Manages two-tier expert caching using benefit density and adaptive watermarks.
 /// Receives fused probabilities and produces cache decisions based on watermark thresholds.
 pub struct WatermarkAlgorithm {
-    /// VRAM capacity in bytes (K_G)
-    #[allow(dead_code)]
+    /// VRAM capacity in mb (K_G)
     vram_capacity: usize,
 
-    /// RAM capacity in bytes (K_R)  
-    #[allow(dead_code)]
+    /// RAM capacity in mb (K_R)  
     ram_capacity: usize,
 
     /// VRAM watermark learning rate (η_G)
@@ -90,15 +88,12 @@ pub struct WatermarkAlgorithm {
     /// Cost of loading expert from NVMe to RAM (C^R)  
     cost_r: f64,
 
-    /// Expert size in bytes (all experts assumed to have same size)
+    /// Expert size in mb (all experts assumed to have same size)
     expert_size: usize,
 
     /// Current watermark values (λ_G, λ_R)
     vram_watermark: f64,
     ram_watermark: f64,
-
-    /// Current time step
-    current_time: u64,
 }
 
 impl WatermarkAlgorithm {
@@ -123,7 +118,6 @@ impl WatermarkAlgorithm {
             expert_size,
             vram_watermark: 0.0,
             ram_watermark: 0.0,
-            current_time: 0,
         }
     }
 

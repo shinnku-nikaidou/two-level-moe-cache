@@ -11,6 +11,7 @@ use policy::{
     watermark::algorithm::WatermarkAlgorithm,
 };
 use pyo3::prelude::*;
+use std::sync::{Arc, RwLock};
 /// Thin Python interface for the two-level MOE cache system
 ///
 /// This is the CORRECT architecture implementation:
@@ -18,7 +19,7 @@ use pyo3::prelude::*;
 #[pyclass]
 pub struct RustTwoTireWmExpertCacheManager {
     /// Timer for time step management
-    pub(crate) timer: Timer,
+    pub(crate) timer: Arc<RwLock<Timer>>,
 
     /// Probability fusion component
     pub(crate) probability_fuser: ProbabilityFusion,
@@ -62,15 +63,15 @@ impl RustTwoTireWmExpertCacheManager {
         let config: ModelConfig = model_type.clone().into();
         let model_type: ModelType = model_type.into();
 
-        // Create probability fusion
-        let probability_fuser = ProbabilityFusion::from_model(model_type);
+        // Create timer from model configuration
+        let timer = Arc::new(RwLock::new(Timer::from_model(&config)));
+
+        // Create probability fusion with shared timer reference
+        let probability_fuser = ProbabilityFusion::from_model(model_type, timer.clone());
 
         // Create watermark algorithm
         let watermark_algorithm =
             WatermarkAlgorithm::from_model(model_type, vram_capacity, ram_capacity);
-
-        // Create timer from model configuration
-        let timer = Timer::from_model(&config);
 
         Ok(Self {
             timer,

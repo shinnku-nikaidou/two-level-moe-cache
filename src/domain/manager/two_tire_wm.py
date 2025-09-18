@@ -52,9 +52,7 @@ class TwoTireWmExpertCacheManager(IExpertCacheManager):
         # Note: Using positional args to match Rust #[new] signature:
         # (model_type, total_layers, vram_capacity, ram_capacity)
         self._rust_cache = RustTwoTireWmExpertCacheManager(
-            rust_model_type(model_type),
-            vram_capacity_mb * 1024 * 1024,
-            ram_capacity_mb * 1024 * 1024,
+            rust_model_type(model_type), vram_capacity_mb, ram_capacity_mb
         )
 
     def update_activations(self, activated_experts: List[int]) -> None:

@@ -8,13 +8,14 @@
 //! 4. Final fusion: p^{fuse}_{e,ℓ}(t) := p^{base}_{e,ℓ}(t) · W(ℓ|ℓ(t))
 
 use super::error::FusionError;
+use crate::timer::Timer;
+use std::sync::{Arc, RwLock};
 
 /// Probability fusion predictor
 ///
 /// Combines EWMA and ScoutGate predictions with forward-causal weighting
 /// based on layer reuse distances. This produces the final fused probabilities
 /// that are used by the watermark algorithm for cache decisions.
-#[derive(Debug, Clone, PartialEq)]
 pub struct ProbabilityFusion {
     /// η parameter for EWMA-ScoutGate blending (0.0 = pure EWMA, 1.0 = pure ScoutGate)
     pub eta: f64,
@@ -22,24 +23,19 @@ pub struct ProbabilityFusion {
     /// γ parameter for reuse distance decay in forward-causal weights
     pub gamma: f64,
 
-    /// Total number of layers in the model (for reuse distance calculation)
-    pub total_layers: usize,
+    /// Timer reference for accessing layer information and time calculations
+    timer: Arc<RwLock<Timer>>,
 }
 
 impl ProbabilityFusion {
     /// Create a new probability fusion predictor
-    pub fn new(eta: f64, gamma: f64, total_layers: usize) -> Self {
-        Self {
-            eta,
-            gamma,
-            total_layers,
-        }
+    pub fn new(eta: f64, gamma: f64, timer: Arc<RwLock<Timer>>) -> Self {
+        Self { eta, gamma, timer }
     }
 
     /// Create fusion predictor from model type
-    pub fn from_model(model_type: crate::constants::ModelType) -> Self {
-        let config: crate::constants::ModelConfig = model_type.into();
-        Self::new(0.5, 0.1, config.total_layers)
+    pub fn from_model(_model_type: crate::constants::ModelType, timer: Arc<RwLock<Timer>>) -> Self {
+        Self::new(0.5, 0.1, timer)
     }
 
     /// Fuse EWMA and ScoutGate predictions with forward-causal weights
@@ -52,7 +48,6 @@ impl ProbabilityFusion {
     /// # Arguments
     /// * `ewma_predictions` - EWMA probability predictions using ExpertProbability
     /// * `scoutgate_predictions` - ScoutGate probability predictions using ExpertProbability
-    /// * `current_layer` - Currently executing layer (0-based)
     ///
     /// # Returns
     /// * `crate::ExpertProbability` - Final fused probabilities p^{fuse}_{e,ℓ}(t)
@@ -60,16 +55,7 @@ impl ProbabilityFusion {
         &self,
         ewma_predictions: &crate::ExpertProbability,
         scoutgate_predictions: &crate::ExpertProbability,
-        current_layer: usize,
     ) -> Result<crate::ExpertProbability, FusionError> {
-        // Validate current layer
-        if current_layer >= self.total_layers {
-            return Err(FusionError::InvalidCurrentLayer {
-                current_layer,
-                total_layers: self.total_layers,
-            });
-        }
-
         // Create output ExpertProbability with same dimensions as inputs
         // Assume all Vec<Vec<T>> structures have identical dimensions
         let mut result = crate::ExpertProbability::new(
@@ -97,7 +83,7 @@ impl ProbabilityFusion {
 
                 // Step 2: Calculate forward-causal weight
                 // W(ℓ|ℓ(t)) := e^{-γ·D(ℓ|ℓ(t))}
-                let reuse_distance = self.calculate_reuse_distance(layer_id, current_layer);
+                let reuse_distance = self.calculate_reuse_distance(layer_id);
                 let causal_weight = self.calculate_causal_weight(reuse_distance);
 
                 // Step 3: Final fusion
@@ -122,17 +108,18 @@ impl ProbabilityFusion {
     ///
     /// # Arguments
     /// * `target_layer` - Target layer ℓ
-    /// * `current_layer` - Current executing layer ℓ(t)
     ///
     /// # Returns
     /// * `usize` - Reuse distance D(ℓ|ℓ(t))
-    pub fn calculate_reuse_distance(&self, target_layer: usize, current_layer: usize) -> usize {
+    pub fn calculate_reuse_distance(&self, target_layer: usize) -> usize {
+        let timer = self.timer.read().unwrap();
+        let current_layer = timer.current_layer();
         if target_layer >= current_layer {
             // Future layers in the current token
             target_layer - current_layer
         } else {
             // Layers in the next token (finish current token to L, then next token from 0 to target)
-            (self.total_layers - current_layer) + target_layer
+            (timer.total_layers() - current_layer) + target_layer
         }
     }
 
@@ -157,16 +144,5 @@ impl ProbabilityFusion {
     /// Get gamma parameter (reuse distance decay factor)
     pub fn gamma(&self) -> f64 {
         self.gamma
-    }
-}
-
-impl Default for ProbabilityFusion {
-    /// Create default fusion predictor suitable for most use cases
-    fn default() -> Self {
-        Self {
-            eta: 0.5,         // Equal weighting of EWMA and ScoutGate
-            gamma: 0.1,       // Moderate decay for forward-causal weights
-            total_layers: 24, // Default for GPT-OSS-20B
-        }
     }
 }
