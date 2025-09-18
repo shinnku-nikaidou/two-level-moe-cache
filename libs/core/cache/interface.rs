@@ -12,6 +12,7 @@ use crate::types::{
 };
 use policy::watermark::algorithm::MemoryTier;
 use pyo3::prelude::*;
+use tracing::info;
 
 #[pymethods]
 impl RustTwoTierWmExpertCacheManager {
@@ -110,6 +111,8 @@ impl RustTwoTierWmExpertCacheManager {
         for &expert_id in &self.current_activated_experts {
             expert_state.inner[current_layer][expert_id] = MemoryTier::Vram;
         }
+
+        info!("Expert state after forced VRAM placement: {:?}", expert_state);
 
         // Pre-allocate result vector with exact capacity
         // Each layer × experts_per_layer × 4_param_types = total entries

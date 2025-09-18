@@ -108,6 +108,7 @@ pub enum MemoryTier {
 /// - All experts start in `MemoryTier::Disk` (default state)
 /// - Containment constraint: VRAM ⊆ RAM ⊆ DISK (maintained by watermark decisions)
 /// - State transitions are driven by benefit density vs watermark comparisons
+#[derive(Debug, Clone, PartialEq)]
 pub struct ExpertState {
     /// 2D matrix: [layer_idx][expert_idx] -> MemoryTier
     /// Public for direct access in functional programming style
