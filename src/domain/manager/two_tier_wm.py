@@ -114,7 +114,7 @@ class TwoTierWmExpertCacheManager(IExpertCacheManager):
             expert_key = ExpertKey(
                 layer_idx=rust_expert_key.layer_idx,
                 expert_id=rust_expert_key.expert_id,
-                param_type=ExpertParamType(rust_expert_key.param_type.name),
+                param_type=ExpertParamType(str(rust_expert_key.param_type)),
             )
 
             # Get the corresponding Expert instance and sync
