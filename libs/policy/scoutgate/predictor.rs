@@ -54,8 +54,16 @@ impl ScoutGatePredictor {
         // Validate configuration - panic on failure
         config.validate().expect("Invalid ScoutGate configuration");
 
-        let predictions =
+        // Create predictions matrix and initialize all values to 1.0 as placeholder
+        let mut predictions =
             ExpertProbability::new(model_config.total_layers, model_config.experts_per_layer);
+
+        // Set all prediction values to 1.0 as placeholder implementation
+        for layer_id in 0..model_config.total_layers {
+            for expert_id in 0..model_config.experts_per_layer {
+                predictions.set(layer_id, expert_id, 1.0);
+            }
+        }
 
         ScoutGatePredictor {
             timer,
@@ -114,69 +122,5 @@ impl ScoutGatePredictor {
     /// In full implementation, this would be the main prediction method.
     pub fn get_probabilities(&self) -> &ExpertProbability {
         &self.predictions
-    }
-
-    /// Get current token context window
-    ///
-    /// Returns a slice of the current token context, which contains
-    /// the most recent tokens up to the configured window size.
-    ///
-    /// # Returns
-    /// * `&[u32]` - Slice of current token context
-    pub fn get_token_context(&self) -> &[u32] {
-        &self.token_context
-    }
-
-    /// Get current context window size
-    ///
-    /// # Returns  
-    /// * `usize` - Current number of tokens in context
-    pub fn context_size(&self) -> usize {
-        self.token_context.len()
-    }
-
-    /// Check if context window is full
-    ///
-    /// # Returns
-    /// * `bool` - True if context window has reached maximum size
-    pub fn is_context_full(&self) -> bool {
-        self.token_context.len() >= self.config.context_window_size
-    }
-
-    /// Get current time step from timer
-    ///
-    /// # Returns
-    /// * `Result<u64, ScoutGateError>` - Current time step
-    pub fn current_time(&self) -> Result<u64, ScoutGateError> {
-        Ok(self.timer.read().unwrap().current_time())
-    }
-
-    /// Clear token context
-    ///
-    /// Removes all tokens from the context window. This might be useful
-    /// when starting a new sequence or resetting the predictor state.
-    pub fn clear_context(&mut self) {
-        self.token_context.clear();
-    }
-
-    /// Get model configuration
-    ///
-    /// Returns the model configuration used by this predictor, which includes
-    /// information about total layers and experts per layer.
-    ///
-    /// # Returns
-    /// * `&ModelConfig` - Reference to the model configuration
-    pub fn model_config(&self) -> &ModelConfig {
-        &self.model_config
-    }
-
-    /// Get ScoutGate configuration
-    ///
-    /// Returns the ScoutGate-specific configuration parameters.
-    ///
-    /// # Returns
-    /// * `&ScoutGateConfig` - Reference to the ScoutGate configuration
-    pub fn scoutgate_config(&self) -> &ScoutGateConfig {
-        &self.config
     }
 }

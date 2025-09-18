@@ -6,7 +6,9 @@
 use crate::types::model::RustModelType;
 use policy::{
     constants::{ModelConfig, ModelType},
+    ewma::predictor::EwmaPredictor,
     fusion::ProbabilityFusion,
+    scoutgate::predictor::ScoutGatePredictor,
     timer::Timer,
     watermark::algorithm::WatermarkAlgorithm,
 };
@@ -20,6 +22,12 @@ use std::sync::{Arc, RwLock};
 pub struct RustTwoTireWmExpertCacheManager {
     /// Timer for time step management
     pub(crate) timer: Arc<RwLock<Timer>>,
+
+    /// EWMA predictor for expert activation probability estimation
+    pub(crate) ewma_predictor: EwmaPredictor,
+
+    /// ScoutGate predictor for semantic-based expert activation prediction
+    pub(crate) scoutgate_predictor: ScoutGatePredictor,
 
     /// Probability fusion component
     pub(crate) probability_fuser: ProbabilityFusion,
@@ -66,6 +74,12 @@ impl RustTwoTireWmExpertCacheManager {
         // Create timer from model configuration
         let timer = Arc::new(RwLock::new(Timer::from_model(&config)));
 
+        // Create EWMA predictor with shared timer reference
+        let ewma_predictor = EwmaPredictor::from_model(timer.clone(), model_type);
+
+        // Create ScoutGate predictor with shared timer reference
+        let scoutgate_predictor = ScoutGatePredictor::from_model(timer.clone(), model_type);
+
         // Create probability fusion with shared timer reference
         let probability_fuser = ProbabilityFusion::from_model(model_type, timer.clone());
 
@@ -75,6 +89,8 @@ impl RustTwoTireWmExpertCacheManager {
 
         Ok(Self {
             timer,
+            ewma_predictor,
+            scoutgate_predictor,
             probability_fuser,
             watermark_algorithm,
         })

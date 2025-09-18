@@ -75,11 +75,9 @@ pub struct WatermarkAlgorithm {
     ram_capacity: usize,
 
     /// VRAM watermark learning rate (η_G)
-    #[allow(dead_code)]
     vram_learning_rate: f64,
 
     /// RAM watermark learning rate (η_R)
-    #[allow(dead_code)]
     ram_learning_rate: f64,
 
     /// Cost of promoting expert from RAM to VRAM (C^G)

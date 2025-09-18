@@ -27,15 +27,59 @@ impl RustTwoTireWmExpertCacheManager {
         panic!("No need to implement get() here;");
     }
 
-    /// Update with new layer activations - placeholder for integration with EWMA/ScoutGate
-    pub fn update_activations(&mut self, _activated_experts: Vec<usize>) -> PyResult<()> {
-        // This would update EWMA predictors and ScoutGate with activation data
-        // For now it's a placeholder
+    /// Update with new layer activations - executes complete data flow pipeline
+    pub fn update_activations(&mut self, activated_experts: Vec<usize>) -> PyResult<()> {
+        // Step 1: Update EWMA predictor with current layer activations
+        self.ewma_predictor
+            .update_layer_activations(&activated_experts)
+            .map_err(|e| {
+                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                    "EWMA update error: {}",
+                    e
+                ))
+            })?;
+
+        // Step 2: Update ScoutGate with placeholder token
+        // TODO: In a real implementation, this would receive the actual token from the inference context
+        let placeholder_token = 0u32; // Placeholder - should come from actual token stream
+        self.scoutgate_predictor
+            .update_token_context(placeholder_token)
+            .map_err(|e| {
+                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                    "ScoutGate update error: {}",
+                    e
+                ))
+            })?;
+
+        // Step 3: Get predictions from both components
+        let ewma_predictions = self.ewma_predictor.get_all_probabilities();
+        let scoutgate_predictions = self.scoutgate_predictor.get_probabilities();
+
+        // Step 4: Fuse probabilities with forward-causal weights
+        let fused_predictions = self
+            .probability_fuser
+            .fuse(ewma_predictions, scoutgate_predictions)
+            .map_err(|e| {
+                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                    "Probability fusion error: {}",
+                    e
+                ))
+            })?;
+
+        // Step 5: Make cache decisions using watermark algorithm
+        // Note: Currently watermark_algorithm.make_cache_decisions() returns ExpertState,
+        // but we don't need to expose it through this interface since Python side
+        // will call experts_status() separately to get the current cache state.
+        let _cache_decisions = self
+            .watermark_algorithm
+            .make_cache_decisions(&fused_predictions);
+
         Ok(())
     }
 
-    /// Advance to next time step
+    /// Advance to next time step - simple timer advancement
     pub fn step_forward(&mut self) -> PyResult<()> {
+        // Simply advance the timer to next step
         let mut timer = self.timer.write().unwrap();
         timer.step();
         Ok(())
