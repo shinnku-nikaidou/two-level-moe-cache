@@ -336,9 +336,9 @@ impl WatermarkAlgorithm {
     pub fn from_model(model_type: ModelType, vram_capacity: f64, ram_capacity: f64) -> Self {
         // Model-specific learning rate tuning based on empirical results
         let (vram_lr, ram_lr) = match model_type {
-            ModelType::GptOss20B => (0.01, 0.01),    // Balanced adaptation
-            ModelType::GptOss120B => (0.005, 0.005), // Slower for stability
-            ModelType::PhiTinyMoe => (0.01, 0.01),   // Fast for small model
+            ModelType::GptOss20B => (0.00001, 0.00001),    // Very conservative adaptation
+            ModelType::GptOss120B => (0.000005, 0.000005), // Even slower for stability
+            ModelType::PhiTinyMoe => (0.00001, 0.00001),   // Conservative for small model
         };
 
         // Expert sizes measured from actual model checkpoints (MB)
@@ -422,10 +422,10 @@ impl WatermarkAlgorithm {
                 let ram_benefit = prob_value * ram_factor; // b^R
 
                 // Apply watermark-based tier assignment
-                // Higher tiers are preferred when benefits exceed thresholds
-                let memory_tier = if vram_benefit >= self.vram_watermark {
+                // Higher tiers are preferred when benefits EXCEED thresholds (strict inequality)
+                let memory_tier = if vram_benefit > self.vram_watermark {
                     MemoryTier::Vram // Highest priority: fast access
-                } else if ram_benefit >= self.ram_watermark {
+                } else if ram_benefit > self.ram_watermark {
                     MemoryTier::Ram // Medium priority: moderate access
                 } else {
                     MemoryTier::Disk // Lowest priority: slow access

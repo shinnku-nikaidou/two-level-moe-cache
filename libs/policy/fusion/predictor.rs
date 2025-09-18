@@ -35,7 +35,7 @@ impl ProbabilityFusion {
 
     /// Create fusion predictor from model type
     pub fn from_model(_model_type: crate::constants::ModelType, timer: Arc<RwLock<Timer>>) -> Self {
-        Self::new(0.0, 0.05, timer)
+        Self::new(0.0, 0.02, timer)
     }
 
     /// Fuse EWMA and ScoutGate predictions with forward-causal weights

@@ -12,7 +12,7 @@ use crate::types::{
 };
 use policy::watermark::algorithm::MemoryTier;
 use pyo3::prelude::*;
-use tracing::info;
+use tracing::{debug, info};
 
 #[pymethods]
 impl RustTwoTierWmExpertCacheManager {
@@ -108,7 +108,7 @@ impl RustTwoTierWmExpertCacheManager {
             )
             .unwrap();
 
-        info!("Fused predictions: {:?}", fused_predictions);
+        debug!("Fused predictions: {:?}", fused_predictions);
 
         let mut expert_state = self.watermark.make_cache_decisions(&fused_predictions);
 
@@ -129,7 +129,7 @@ impl RustTwoTierWmExpertCacheManager {
             expert_state.inner[current_layer][expert_id] = MemoryTier::Vram;
         }
 
-        info!(
+        debug!(
             "Expert state after forced VRAM placement: {:?}",
             expert_state
         );

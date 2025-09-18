@@ -10,8 +10,12 @@ def test_rust_core_basic():
 
     # Import all the Rust types
     try:
-        from rust_core import (ExpertKey, ExpertParamType, MemoryTier,
-                               TwoTierWmExpertCacheManager, WatermarkConfig)
+        from rust_core import (
+            RustExpertKey,
+            RustExpertParamType,
+            RustMemoryTier,
+            RustTwoTierWmExpertCacheManager,
+        )
     except ImportError as e:
         print(f"❌ Failed to import Rust types: {e}")
         return False
@@ -19,41 +23,27 @@ def test_rust_core_basic():
     print("✅ All Rust types imported successfully")
 
     # Test MemoryTier constants
-    print(f"MemoryTier.VRAM: {MemoryTier.VRAM}")
-    print(f"MemoryTier.RAM: {MemoryTier.RAM}")
-    print(f"MemoryTier.DISK: {MemoryTier.DISK}")
+    print(f"MemoryTier.VRAM: {RustMemoryTier.VRAM}")
+    print(f"MemoryTier.RAM: {RustMemoryTier.RAM}")
+    print(f"MemoryTier.DISK: {RustMemoryTier.DISK}")
 
     # Test ExpertParamType constants
-    print(f"ExpertParamType.MLP1_WEIGHT: {ExpertParamType.MLP1_WEIGHT}")
-    print(f"ExpertParamType.MLP1_BIAS: {ExpertParamType.MLP1_BIAS}")
-    print(f"ExpertParamType.MLP2_WEIGHT: {ExpertParamType.MLP2_WEIGHT}")
-    print(f"ExpertParamType.MLP2_BIAS: {ExpertParamType.MLP2_BIAS}")
+    print(f"ExpertParamType.MLP1_WEIGHT: {RustExpertParamType.MLP1_WEIGHT}")
+    print(f"ExpertParamType.MLP1_BIAS: {RustExpertParamType.MLP1_BIAS}")
+    print(f"ExpertParamType.MLP2_WEIGHT: {RustExpertParamType.MLP2_WEIGHT}")
+    print(f"ExpertParamType.MLP2_BIAS: {RustExpertParamType.MLP2_BIAS}")
 
     # Test creating ExpertKey
-    expert_key = ExpertKey(
-        layer_idx=0, expert_id=1, param_type=ExpertParamType.MLP1_WEIGHT
+    expert_key = RustExpertKey(
+        layer_idx=0, expert_id=1, param_type=RustExpertParamType.MLP1_WEIGHT
     )
     print(f"✅ ExpertKey created: {expert_key}")
 
-    # Test creating WatermarkConfig
-    config = WatermarkConfig(
-        vram_capacity=1024,
-        ram_capacity=4096,
-        vram_learning_rate=0.01,
-        ram_learning_rate=0.01,
-        fusion_eta=0.5,
-        reuse_decay_gamma=0.1,
-    )
-    print(
-        f"✅ WatermarkConfig created with VRAM: {config.vram_capacity}, RAM: {config.ram_capacity}"
-    )
-
     # Test creating TwoTierWmExpertCacheManager
-    cache_manager = TwoTierWmExpertCacheManager(
+    cache_manager = RustTwoTierWmExpertCacheManager(
         model_type="gpt-oss-20b",
-        total_layers=24,
         vram_capacity=1024,  # 1GB in MB
-        ram_capacity=4096,   # 4GB in MB
+        ram_capacity=4096,  # 4GB in MB
     )
     print("✅ TwoTierWmExpertCacheManager created successfully")
 
