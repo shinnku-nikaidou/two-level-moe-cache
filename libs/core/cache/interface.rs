@@ -85,33 +85,68 @@ impl RustTwoTireWmExpertCacheManager {
         Ok(())
     }
 
-    /// Get simplified status of all tracked experts
+    /// Get current expert status across all memory tiers
+    ///
+    /// This method provides a complete snapshot of expert-parameter placement
+    /// decisions based on current algorithm state. It recomputes the entire
+    /// prediction and decision pipeline to get the most up-to-date status.
+    ///
+    /// # Returns  
+    /// Vector of `RustExpertStatus` objects representing current tier assignments.
+    /// Each expert generates 4 status entries (one per MLP parameter type).
+    ///
+    /// # Performance
+    /// - Time complexity: O(L × E) for prediction + decision pipeline
+    /// - Recomputes predictions and cache decisions each call
+    /// - Memory tier encoding: 0=VRAM, 1=RAM, 2=DISK
+    ///
+    /// # Notes
+    /// - Uses current predictor state (EWMA values, ScoutGate context)
+    /// - All 4 parameter types per expert have same tier assignment
     pub fn experts_status(&self) -> Vec<RustExpertStatus> {
-        todo!()
-        // self.watermark_algorithm
-        //     .expert_states()
-        //     .iter()
-        //     .flat_map(|(expert, memory_tier)| {
-        //         let tier_u8 = match memory_tier {
-        //             MemoryTier::Vram => 0,
-        //             MemoryTier::Ram => 1,
-        //             MemoryTier::Disk => 2,
-        //         };
+        let fused_predictions = self
+            .probability_fuser
+            .fuse(
+                self.ewma_predictor.get_probabilities(),
+                self.scoutgate_predictor.get_probabilities(),
+            )
+            .unwrap();
 
-        //         // Generate RustExpertKey for all 4 parameter types per expert
-        //         vec![
-        //             crate::types::expert::RustExpertParamType::MLP1_WEIGHT,
-        //             crate::types::expert::RustExpertParamType::MLP1_BIAS,
-        //             crate::types::expert::RustExpertParamType::MLP2_WEIGHT,
-        //             crate::types::expert::RustExpertParamType::MLP2_BIAS,
-        //         ]
-        //         .into_iter()
-        //         .map(move |param_type| {
-        //             let core_expert_key =
-        //                 RustExpertKey::new(expert.layer_id, expert.expert_id, param_type);
-        //             RustExpertStatus::new(core_expert_key, tier_u8)
-        //         })
-        //     })
-        //     .collect()
+        let expert_state = self
+            .watermark_algorithm
+            .make_cache_decisions(&fused_predictions);
+
+        expert_state
+            .inner
+            .iter()
+            .enumerate()
+            .flat_map(|(layer_idx, layer_experts)| {
+                // Process all experts in current layer
+                layer_experts
+                    .iter()
+                    .enumerate()
+                    .flat_map(move |(expert_idx, &memory_tier)| {
+                        // Convert MemoryTier enum to u8 for Python interface
+                        let tier_u8 = match memory_tier {
+                            policy::watermark::algorithm::MemoryTier::Vram => 0,
+                            policy::watermark::algorithm::MemoryTier::Ram => 1,
+                            policy::watermark::algorithm::MemoryTier::Disk => 2,
+                        };
+
+                        // Generate status for all 4 parameter types per expert
+                        [
+                            crate::types::expert::RustExpertParamType::MLP1_WEIGHT,
+                            crate::types::expert::RustExpertParamType::MLP1_BIAS,
+                            crate::types::expert::RustExpertParamType::MLP2_WEIGHT,
+                            crate::types::expert::RustExpertParamType::MLP2_BIAS,
+                        ]
+                        .into_iter()
+                        .map(move |param_type| {
+                            let expert_key = RustExpertKey::new(layer_idx, expert_idx, param_type);
+                            RustExpertStatus::new(expert_key, tier_u8)
+                        })
+                    })
+            })
+            .collect()
     }
 }
