@@ -1,7 +1,7 @@
 """
-Two-Tire Watermark expert cache manager.
+Two-Tier Watermark expert cache manager.
 
-This module provides a Python wrapper around the Rust-based TwoTireWmExpertCacheManager
+This module provides a Python wrapper around the Rust-based TwoTierWmExpertCacheManager
 for watermark-based expert caching with dual-tier memory management.
 """
 
@@ -11,10 +11,10 @@ from ..cache.entities.expert import Expert
 from src.common.types import ExpertKey, MemoryTier, ExpertParamType
 from .. import ModelType
 from .utils import rust_model_type
-from rust_core import RustTwoTireWmExpertCacheManager
+from rust_core import RustTwoTierWmExpertCacheManager
 
 
-class TwoTireWmExpertCacheManager(IExpertCacheManager):
+class TwoTierWmExpertCacheManager(IExpertCacheManager):
     """
     Two-Tier Watermark-based expert cache manager.
 
@@ -51,7 +51,7 @@ class TwoTireWmExpertCacheManager(IExpertCacheManager):
         # Initialize Rust implementation (simplified interface)
         # Note: Using positional args to match Rust #[new] signature:
         # (model_type, total_layers, vram_capacity, ram_capacity)
-        self._rust_cache = RustTwoTireWmExpertCacheManager(
+        self._rust_cache = RustTwoTierWmExpertCacheManager(
             rust_model_type(model_type), vram_capacity_mb, ram_capacity_mb
         )
 

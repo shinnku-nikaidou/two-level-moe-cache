@@ -24,7 +24,7 @@ impl Timer {
     ///
     /// # Arguments
     /// * `config` - Model configuration containing layer information
-    pub fn from_model(config: &crate::constants::ModelConfig) -> Self {
+    pub fn from_config(config: &crate::constants::ModelConfig) -> Self {
         use crate::constants::{GPT_OSS_20B, GPT_OSS_120B, PHI_TINY_MOE};
 
         match config.name {

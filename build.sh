@@ -17,4 +17,4 @@ EOF
 
 echo "✅ Build completed successfully!"
 echo "🧪 Running tests..."
-python tests/test_two_tire_wm.py
+python tests/test_two_tier_wm.py

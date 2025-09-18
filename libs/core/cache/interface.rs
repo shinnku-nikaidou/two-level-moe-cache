@@ -1,9 +1,9 @@
 //! Python interface methods for the cache manager
 //!
 //! This module contains all PyO3 methods and Python-facing interfaces
-//! for the TwoTireWmExpertCacheManager.
+//! for the TwoTierWmExpertCacheManager.
 
-use super::manager::RustTwoTireWmExpertCacheManager;
+use super::manager::RustTwoTierWmExpertCacheManager;
 use crate::types::{
     expert::{RustExpertKey, RustExpertParamType},
     model::RustModelType,
@@ -26,7 +26,7 @@ impl<T, E: std::fmt::Display> PyResultExt<T> for Result<T, E> {
 }
 
 #[pymethods]
-impl RustTwoTireWmExpertCacheManager {
+impl RustTwoTierWmExpertCacheManager {
     #[new]
     pub fn py_new(
         model_type: RustModelType,

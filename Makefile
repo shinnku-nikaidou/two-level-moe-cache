@@ -42,7 +42,7 @@ build: setup-module
 .PHONY: test
 test: build
 	@echo "🧪 Running tests..."
-	. $(PYTHON_ENV)/bin/activate && python tests/test_two_tire_wm.py
+	. $(PYTHON_ENV)/bin/activate && python tests/test_two_tier_wm.py
 
 # Clean up build artifacts and caches
 .PHONY: clean
@@ -84,7 +84,7 @@ dev: build
 .PHONY: test-quick
 test-quick:
 	@echo "⚡ Running quick tests..."
-	. $(PYTHON_ENV)/bin/activate && python tests/test_two_tire_wm.py
+	. $(PYTHON_ENV)/bin/activate && python tests/test_two_tier_wm.py
 
 # Format code
 .PHONY: format

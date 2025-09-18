@@ -11,7 +11,7 @@ def test_rust_core_basic():
     # Import all the Rust types
     try:
         from rust_core import (
-            TwoTireWmExpertCacheManager,
+            TwoTierWmExpertCacheManager,
             WatermarkConfig,
             ExpertKey,
             ExpertParamType,
@@ -53,14 +53,14 @@ def test_rust_core_basic():
         f"✅ WatermarkConfig created with VRAM: {config.vram_capacity}, RAM: {config.ram_capacity}"
     )
 
-    # Test creating TwoTireWmExpertCacheManager
-    cache_manager = TwoTireWmExpertCacheManager(
+    # Test creating TwoTierWmExpertCacheManager
+    cache_manager = TwoTierWmExpertCacheManager(
         model_type="gpt-oss-20b",
         total_layers=24,
         vram_capacity=1024 * 1024 * 1024,  # 1GB
         ram_capacity=4096 * 1024 * 1024,  # 4GB
     )
-    print("✅ TwoTireWmExpertCacheManager created successfully")
+    print("✅ TwoTierWmExpertCacheManager created successfully")
 
     return True
 

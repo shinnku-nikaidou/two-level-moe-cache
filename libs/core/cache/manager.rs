@@ -1,6 +1,6 @@
 //! Core manager structure for the two-level watermark cache
 //!
-//! This module defines the main TwoTireWmExpertCacheManager struct and its
+//! This module defines the main TwoTierWmExpertCacheManager struct and its
 //! core data structures, serving as a thin Python interface layer.
 
 use crate::types::model::RustModelType;
@@ -19,7 +19,7 @@ use std::sync::{Arc, RwLock};
 /// This is the CORRECT architecture implementation:
 /// Core layer is ONLY a Python interface - all business logic in policy layer
 #[pyclass]
-pub struct RustTwoTireWmExpertCacheManager {
+pub struct RustTwoTierWmExpertCacheManager {
     /// Timer for time step management
     pub(crate) timer: Arc<RwLock<Timer>>,
 
@@ -36,7 +36,7 @@ pub struct RustTwoTireWmExpertCacheManager {
     pub(crate) watermark_algorithm: WatermarkAlgorithm,
 }
 
-impl RustTwoTireWmExpertCacheManager {
+impl RustTwoTierWmExpertCacheManager {
     /// Create a new cache manager instance
     ///
     /// This function automatically derives all expert keys from the provided model type
@@ -72,7 +72,7 @@ impl RustTwoTireWmExpertCacheManager {
         let model_type: ModelType = model_type.into();
 
         // Create timer from model configuration
-        let timer = Arc::new(RwLock::new(Timer::from_model(&config)));
+        let timer = Arc::new(RwLock::new(Timer::from_config(&config)));
 
         // Create EWMA predictor with shared timer reference
         let ewma_predictor = EwmaPredictor::from_model(timer.clone(), model_type);

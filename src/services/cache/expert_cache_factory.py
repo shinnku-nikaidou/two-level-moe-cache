@@ -12,7 +12,7 @@ from src.domain.manager import (
     LRUExpertCacheManager,
     DirectNVMEExpertCacheManager,
     DirectRAMExpertCacheManager,
-    TwoTireWmExpertCacheManager,
+    TwoTierWmExpertCacheManager,
 )
 from src.domain import ModelType
 
@@ -30,7 +30,7 @@ class ExpertCacheFactory:
         "lru": LRUExpertCacheManager,
         "direct_vram": DirectNVMEExpertCacheManager,
         "direct_ram": DirectRAMExpertCacheManager,
-        "two_tire_wm": TwoTireWmExpertCacheManager,
+        "two_tier_wm": TwoTierWmExpertCacheManager,
     }
 
     @classmethod
@@ -96,7 +96,7 @@ class ExpertCacheFactory:
         return DirectRAMExpertCacheManager(model_type=model_type)
 
     @classmethod
-    def create_two_tire_wm_cache_manager(
+    def create_two_tier_wm_cache_manager(
         cls,
         model_type: ModelType,
         vram_capacity_mb: int = 5120,
@@ -120,7 +120,7 @@ class ExpertCacheFactory:
         Raises:
             RuntimeError: If Rust core library is not available
         """
-        return TwoTireWmExpertCacheManager(
+        return TwoTierWmExpertCacheManager(
             model_type=model_type,
             vram_capacity_mb=vram_capacity_mb,
             ram_capacity_mb=ram_capacity_mb,

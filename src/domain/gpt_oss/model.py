@@ -8,6 +8,7 @@ components with domain-specific optimizations like expert caching.
 import os
 import json
 import torch
+from typing import Optional
 
 from src.boilerplate.gpt_oss.model import (
     ModelConfig,
@@ -19,6 +20,7 @@ from src.domain.cache.interfaces.expert_cache import IExpertCacheManager
 from src.services.cache import ExpertCacheFactory
 from src.config.util import get_checkpoint_path
 from src.domain import ModelType
+from src.domain.manager import CacheManagerType
 from src.config import TORCH_VRAM_DEVICE
 from .moe import LazyMLPBlock
 
@@ -73,6 +75,7 @@ class LazyTransformer(torch.nn.Module):
         self,
         config: ModelConfig,
         model_type: ModelType,
+        cache_manager_type: CacheManagerType = CacheManagerType.DIRECT_RAM,
     ):
         """
         Initialize lazy transformer with expert cache system.
@@ -80,12 +83,31 @@ class LazyTransformer(torch.nn.Module):
         Args:
             config: Model configuration
             model_type: Model type for automatic checkpoint path resolution
+            cache_manager_type: Type of cache manager to use (default: DIRECT_RAM)
         """
         super().__init__()
         self.config = config
-        self.expert_cache_manager = ExpertCacheFactory.create_direct_ram_cache_manager(
-            model_type=model_type,
-        )
+        
+        # Create appropriate cache manager based on type
+        match cache_manager_type:
+            case CacheManagerType.LRU:
+                self.expert_cache_manager = ExpertCacheFactory.create_lru_cache_manager(
+                    model_type=model_type
+                )
+            case CacheManagerType.DIRECT_NVME:
+                self.expert_cache_manager = ExpertCacheFactory.create_direct_nvme_cache_manager(
+                    model_type=model_type
+                )
+            case CacheManagerType.DIRECT_RAM:
+                self.expert_cache_manager = ExpertCacheFactory.create_direct_ram_cache_manager(
+                    model_type=model_type
+                )
+            case CacheManagerType.TWO_TIER_WM:
+                self.expert_cache_manager = ExpertCacheFactory.create_two_tier_wm_cache_manager(
+                    model_type=model_type
+                )
+            case _:
+                raise ValueError(f"Unsupported cache manager type: {cache_manager_type}")
 
         # Standard components with global device config
         self.embedding = torch.nn.Embedding(
@@ -123,12 +145,16 @@ class LazyTransformer(torch.nn.Module):
         return x
 
     @staticmethod
-    def from_model_type(model_type: ModelType) -> "LazyTransformer":
+    def from_model_type(
+        model_type: ModelType, 
+        cache_manager_type: CacheManagerType = CacheManagerType.DIRECT_RAM
+    ) -> "LazyTransformer":
         """
         Load transformer from model type with lazy loading.
 
         Args:
             model_type: Model type for automatic checkpoint path and config resolution
+            cache_manager_type: Type of cache manager to use (default: DIRECT_RAM)
 
         Returns:
             LazyTransformer with lazy loading enabled
@@ -141,7 +167,11 @@ class LazyTransformer(torch.nn.Module):
             json_config = json.load(f)
             model_config = ModelConfig(**json_config)
 
-        model = LazyTransformer(config=model_config, model_type=model_type)
+        model = LazyTransformer(
+            config=model_config, 
+            model_type=model_type,
+            cache_manager_type=cache_manager_type
+        )
         model.eval()
 
         checkpoint = Checkpoint(checkpoint_dir, TORCH_VRAM_DEVICE)

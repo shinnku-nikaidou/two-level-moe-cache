@@ -7,7 +7,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.domain.manager.direct_nvme import DirectNVMEExpertCacheManager
 from src.domain import ModelType
-from src.domain.cache.entities.types import ExpertKey, ExpertParamType
+from src.common.types import ExpertKey, ExpertParamType
 
 
 def test_direct_nvme_shared_experts():

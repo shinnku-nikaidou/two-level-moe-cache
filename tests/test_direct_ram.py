@@ -10,12 +10,12 @@ This test validates that DirectRAM correctly:
 
 import sys
 import os
+from src.common.types import ExpertKey, ExpertParamType
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.domain.manager.direct_ram import DirectRAMExpertCacheManager
 from src.domain import ModelType
-from src.domain.cache.entities.types import ExpertKey, ExpertParamType
 
 # Global cache instance - shared across all tests to avoid multiple pre-warming
 _shared_cache = None

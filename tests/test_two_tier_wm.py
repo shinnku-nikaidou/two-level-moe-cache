@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script for TwoTireWmExpertCacheManager.
+Test script for TwoTierWmExpertCacheManager.
 
 This script tests the basic functionality of the two-tier watermark cache
 manager including imports, initialization, and basic operations.
@@ -17,7 +17,7 @@ def test_rust_imports():
     """Test if Rust core library can be imported."""
     print("=== Testing Rust Core Imports ===")
 
-    from rust_core import RustTwoTireWmExpertCacheManager
+    from rust_core import RustTwoTierWmExpertCacheManager
     from rust_core import RustExpertKey
 
     print("✅ Rust core library imported successfully")
@@ -29,7 +29,7 @@ def test_python_wrapper():
     print("\n=== Testing Python Wrapper ===")
 
     # Test that we can create the wrapper directly
-    from src.domain.manager.two_tire_wm import TwoTireWmExpertCacheManager
+    from src.domain.manager.two_tier_wm import TwoTierWmExpertCacheManager
 
     print("✅ Python wrapper imported successfully")
     return True
@@ -48,7 +48,7 @@ def test_factory():
 
 def main():
     """Run all tests."""
-    print("Testing TwoTireWmExpertCacheManager Implementation")
+    print("Testing TwoTierWmExpertCacheManager Implementation")
     print("=" * 50)
 
     tests = [

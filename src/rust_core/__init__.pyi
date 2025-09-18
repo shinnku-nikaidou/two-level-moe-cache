@@ -6,7 +6,7 @@ Updated during policy layer integration to include watermark debugging methods.
 All Rust PyClass exports now have "Rust" prefix for clear namespace separation.
 """
 
-from typing import List, Optional
+from typing import List
 from enum import IntEnum
 
 class RustMemoryTier(IntEnum):
@@ -50,7 +50,7 @@ class RustExpertStatus:
     def current_tier(self) -> int: ...  # 0=VRAM, 1=RAM, 2=DISK
     def __repr__(self) -> str: ...
 
-class RustTwoTireWmExpertCacheManager:
+class RustTwoTierWmExpertCacheManager:
     """Two-tier watermark-based expert cache manager."""
 
     def __init__(
