@@ -44,6 +44,7 @@
 
 use crate::constants::ModelType;
 use serde::{Deserialize, Serialize};
+use tracing::{debug, info};
 
 /// Cache decision for an expert weight
 ///
@@ -320,7 +321,7 @@ impl WatermarkAlgorithm {
         };
 
         // Expert sizes measured from actual model checkpoints (bytes)
-        let expert_size_bytes = match model_type {
+        let expert_size = match model_type {
             ModelType::GptOss20B => 52_923_244, // ~50.47 MB per expert (measured)
             ModelType::GptOss120B => 100_000_000, // ~95.37 MB estimated (larger hidden/intermediate dims)
             ModelType::PhiTinyMoe => 1_048_576,   // ~1 MB for tiny model
@@ -331,9 +332,9 @@ impl WatermarkAlgorithm {
             ram_capacity_mb * 1024 * 1024,  // Convert MB to bytes
             vram_lr,
             ram_lr,
-            1.0,  // cost_g: RAM→VRAM baseline cost
-            10.0, // cost_r: Disk→RAM is ~10x slower than RAM→VRAM
-            expert_size_bytes,
+            52923244.0, // cost_g: RAM→VRAM baseline cost
+            52923244.0, // cost_r: Disk→RAM cost
+            expert_size,
         )
     }
 
@@ -384,9 +385,9 @@ impl WatermarkAlgorithm {
         let mut inner = Vec::with_capacity(num_layers);
 
         // Precompute constants to avoid repeated calculations
-        let size = self.expert_size as f64;
-        let vram_factor = self.cost_g / size; // For b^G calculation
-        let ram_factor = self.cost_r / size; // For b^R calculation
+        let expert_size = self.expert_size as f64;
+        let vram_factor = self.cost_g / expert_size; // For b^G calculation
+        let ram_factor = self.cost_r / expert_size; // For b^R calculation
 
         // Simple nested loops for clear control flow
         for layer_probs in &fused_prob.inner {
@@ -504,6 +505,11 @@ impl WatermarkAlgorithm {
                 break; // Both VRAM and RAM constraints satisfied
             }
         }
+
+        info!(
+            "Updated watermarks: VRAM = {:.4}, RAM = {:.4}",
+            self.vram_watermark, self.ram_watermark
+        );
     }
 
     /// Calculate total memory usage for each tier from expert state
@@ -574,7 +580,10 @@ impl WatermarkAlgorithm {
                 }
             }
         }
-
+        debug!(
+            "Calculated tier usage: VRAM = {} bytes, RAM = {} bytes",
+            vram_usage, ram_usage
+        );
         (vram_usage, ram_usage)
     }
 }
