@@ -366,37 +366,47 @@ impl WatermarkAlgorithm {
     /// Time complexity: O(L × E) where L=layers, E=experts per layer
     /// Space complexity: O(L × E) for result matrix
     pub fn make_cache_decisions(&self, fused_prob: &crate::ExpertProbability) -> ExpertState {
-        // Process all layers and experts using functional programming style
-        // This approach is efficient and maintains immutability where possible
-        let inner = fused_prob
-            .inner
-            .iter()
-            .map(|layer_probs| {
-                // Process all experts in current layer
-                layer_probs
-                    .iter()
-                    .map(|prob| {
-                        // Extract probability value, treating None as 0.0 (inactive)
-                        let prob_value = prob.unwrap_or(0.0);
+        // Pre-allocate result matrix with exact dimensions
+        let num_layers = fused_prob.inner.len();
+        let num_experts = if num_layers > 0 {
+            fused_prob.inner[0].len()
+        } else {
+            panic!("No layers in fused probabilities")
+        };
+        let mut inner = Vec::with_capacity(num_layers);
 
-                        // Calculate benefit densities for both tiers
-                        let size = self.expert_size as f64;
-                        let vram_benefit = prob_value * self.cost_g / size; // b^G
-                        let ram_benefit = prob_value * self.cost_r / size; // b^R
+        // Precompute constants to avoid repeated calculations
+        let size = self.expert_size as f64;
+        let vram_factor = self.cost_g / size; // For b^G calculation
+        let ram_factor = self.cost_r / size; // For b^R calculation
 
-                        // Apply watermark-based tier assignment
-                        // Higher tiers are preferred when benefits exceed thresholds
-                        if vram_benefit >= self.vram_watermark {
-                            MemoryTier::Vram // Highest priority: fast access
-                        } else if ram_benefit >= self.ram_watermark {
-                            MemoryTier::Ram // Medium priority: moderate access
-                        } else {
-                            MemoryTier::Disk // Lowest priority: slow access
-                        }
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>();
+        // Simple nested loops for clear control flow
+        for layer_probs in &fused_prob.inner {
+            let mut layer_decisions = Vec::with_capacity(num_experts);
+
+            for prob_opt in layer_probs {
+                // Extract probability value, treating None as 0.0 (inactive)
+                let prob_value = prob_opt.unwrap_or(0.0);
+
+                // Calculate benefit densities for both tiers
+                let vram_benefit = prob_value * vram_factor; // b^G
+                let ram_benefit = prob_value * ram_factor; // b^R
+
+                // Apply watermark-based tier assignment
+                // Higher tiers are preferred when benefits exceed thresholds
+                let memory_tier = if vram_benefit >= self.vram_watermark {
+                    MemoryTier::Vram // Highest priority: fast access
+                } else if ram_benefit >= self.ram_watermark {
+                    MemoryTier::Ram // Medium priority: moderate access
+                } else {
+                    MemoryTier::Disk // Lowest priority: slow access
+                };
+
+                layer_decisions.push(memory_tier);
+            }
+
+            inner.push(layer_decisions);
+        }
 
         ExpertState { inner }
     }
@@ -448,46 +458,43 @@ impl WatermarkAlgorithm {
     /// * May require multiple iterations for convergence
     /// * Watermarks monotonically increase until constraints are satisfied
     pub fn update_watermarks(&mut self, fused_prob: &crate::ExpertProbability) {
+        // PHASE 1: VRAM Feasibility Repair Loop
+        // Adjust VRAM watermark until VRAM usage is within capacity
         loop {
-            // STEP 1: Make cache decisions using current watermark thresholds
-            // This determines where each expert would be placed given current state
             let expert_state = self.make_cache_decisions(fused_prob);
-
-            // STEP 2: Calculate memory usage resulting from these decisions
-            // Accounts for containment constraint (VRAM experts also consume RAM)
-            let (vram_usage, ram_usage) = self.calculate_tier_usage(&expert_state);
-
-            // STEP 3: Apply projected subgradient updates to watermarks
-            // This implements the core mathematical formula from the paper
+            let (vram_usage, _) = self.calculate_tier_usage(&expert_state);
 
             // VRAM watermark update: λ_G ← [λ_G + η_G(usage_G - K_G)]₊
             let new_vram_watermark = (self.vram_watermark
                 + self.vram_learning_rate * (vram_usage as f64 - self.vram_capacity as f64))
-                .max(0.0); // Non-negative projection [·]₊
+                .max(0.0);
+
+            self.vram_watermark = new_vram_watermark;
+
+            // Check VRAM feasibility
+            if vram_usage <= self.vram_capacity {
+                break; // VRAM constraint satisfied, move to RAM phase
+            }
+        }
+
+        // PHASE 2: RAM Feasibility Repair Loop
+        // Adjust RAM watermark until RAM usage is within capacity
+        // VRAM decisions are already feasible from Phase 1
+        loop {
+            let expert_state = self.make_cache_decisions(fused_prob);
+            let (_, ram_usage) = self.calculate_tier_usage(&expert_state);
 
             // RAM watermark update: λ_R ← [λ_R + η_R(usage_R - K_R)]₊
             let new_ram_watermark = (self.ram_watermark
                 + self.ram_learning_rate * (ram_usage as f64 - self.ram_capacity as f64))
-                .max(0.0); // Non-negative projection [·]₊
+                .max(0.0);
 
-            // STEP 4: Check feasibility - are capacity constraints satisfied?
-            // If both tiers are within capacity limits, we have found a feasible solution
-            if vram_usage <= self.vram_capacity && ram_usage <= self.ram_capacity {
-                // FEASIBLE SOLUTION FOUND
-                // Update watermarks to their final values and exit
-                self.vram_watermark = new_vram_watermark;
-                self.ram_watermark = new_ram_watermark;
-                break;
-            }
-
-            // STEP 5: Continue feasibility repair
-            // Constraints not yet satisfied - update watermarks and continue iteration
-            // Higher watermarks will cause fewer experts to qualify for each tier
-            self.vram_watermark = new_vram_watermark;
             self.ram_watermark = new_ram_watermark;
 
-            // Loop continues with updated watermarks...
-            // Mathematical convergence guarantees this will terminate
+            // Check RAM feasibility
+            if ram_usage <= self.ram_capacity {
+                break; // Both VRAM and RAM constraints satisfied
+            }
         }
     }
 
