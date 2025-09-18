@@ -1,5 +1,5 @@
 // EWMA parameters
-pub const ALPHA: f64 = 0.3;
+pub const ALPHA: f64 = 0.5;
 
 // Model configurations
 /// Model configuration structure

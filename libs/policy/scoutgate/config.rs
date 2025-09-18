@@ -4,6 +4,8 @@
 //! algorithm as described in the documentation. For now, this provides a basic
 //! configuration structure that can be extended when the full implementation is added.
 
+use super::hyperparamater::*;
+
 /// Configuration for ScoutGate predictor parameters
 ///
 /// Based on the ScoutGate algorithm specification in the documentation:
@@ -110,13 +112,13 @@ impl Default for ScoutGateConfig {
     /// Default configuration based on documentation specifications
     fn default() -> Self {
         Self {
-            context_window_size: 8,   // m = 8 tokens
-            projection_dim: 128,      // d_proj = 128
-            layer_embedding_dim: 64,  // d_ℓ reasonable default
-            expert_embedding_dim: 64, // d_e reasonable default
-            hidden_dim: 256,          // d_h reasonable default
-            low_rank_dim: 64,         // d' reasonable default
-            layer_norm_eps: 1e-5,     // Standard epsilon
+            context_window_size: DEFAULT_CONTEXT_WINDOW_SIZE,
+            projection_dim: DEFAULT_PROJECTION_DIM,
+            layer_embedding_dim: DEFAULT_LAYER_EMBEDDING_DIM,
+            expert_embedding_dim: DEFAULT_EXPERT_EMBEDDING_DIM,
+            hidden_dim: DEFAULT_HIDDEN_DIM,
+            low_rank_dim: DEFAULT_LOW_RANK_DIM,
+            layer_norm_eps: DEFAULT_LAYER_NORM_EPS,
         }
     }
 }

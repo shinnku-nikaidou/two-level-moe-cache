@@ -7,6 +7,19 @@ use super::manager::RustTwoTireWmExpertCacheManager;
 use crate::types::{expert::RustExpertKey, model::RustModelType, status::RustExpertStatus};
 use pyo3::prelude::*;
 
+/// Extension trait to add convenient error conversion methods
+trait PyResultExt<T> {
+    fn py_context(self, context: &str) -> PyResult<T>;
+}
+
+impl<T, E: std::fmt::Display> PyResultExt<T> for Result<T, E> {
+    fn py_context(self, context: &str) -> PyResult<T> {
+        self.map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{}: {}", context, e))
+        })
+    }
+}
+
 #[pymethods]
 impl RustTwoTireWmExpertCacheManager {
     #[new]
@@ -32,41 +45,19 @@ impl RustTwoTireWmExpertCacheManager {
         // Step 1: Update EWMA predictor with current layer activations
         self.ewma_predictor
             .update_layer_activations(&activated_experts)
-            .map_err(|e| {
-                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                    "EWMA update error: {}",
-                    e
-                ))
-            })?;
+            .py_context("EWMA update error")?;
 
-        // Step 2: Update ScoutGate with placeholder token
-        // TODO: In a real implementation, this would receive the actual token from the inference context
-        let placeholder_token = 0u32; // Placeholder - should come from actual token stream
-        self.scoutgate_predictor
-            .update_token_context(placeholder_token)
-            .map_err(|e| {
-                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                    "ScoutGate update error: {}",
-                    e
-                ))
-            })?;
-
-        // Step 3: Get predictions from both components
-        let ewma_predictions = self.ewma_predictor.get_all_probabilities();
+        // Step 2: Get predictions from both components
+        let ewma_predictions = self.ewma_predictor.get_probabilities();
         let scoutgate_predictions = self.scoutgate_predictor.get_probabilities();
 
-        // Step 4: Fuse probabilities with forward-causal weights
+        // Step 3: Fuse probabilities with forward-causal weights
         let fused_predictions = self
             .probability_fuser
             .fuse(ewma_predictions, scoutgate_predictions)
-            .map_err(|e| {
-                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                    "Probability fusion error: {}",
-                    e
-                ))
-            })?;
+            .py_context("Probability fusion error")?;
 
-        // Step 5: Make cache decisions using watermark algorithm
+        // Step 4: Make cache decisions using watermark algorithm
         // Note: Currently watermark_algorithm.make_cache_decisions() returns ExpertState,
         // but we don't need to expose it through this interface since Python side
         // will call experts_status() separately to get the current cache state.
@@ -80,8 +71,17 @@ impl RustTwoTireWmExpertCacheManager {
     /// Advance to next time step - simple timer advancement
     pub fn step_forward(&mut self) -> PyResult<()> {
         // Simply advance the timer to next step
-        let mut timer = self.timer.write().unwrap();
-        timer.step();
+        {
+            let mut timer = self.timer.write().unwrap();
+            timer.step();
+        }
+
+        // TODO: In a real implementation, this would receive the actual token from the inference context
+        let placeholder_token = 0u32; // Placeholder - should come from actual token stream
+        self.scoutgate_predictor
+            .update_token_context(placeholder_token)
+            .py_context("ScoutGate update error")?;
+
         Ok(())
     }
 

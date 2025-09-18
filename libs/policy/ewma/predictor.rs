@@ -94,31 +94,8 @@ impl EwmaPredictor {
         Ok(())
     }
 
-    /// Get EWMA probability estimate for a specific expert-layer pair
-    /// Returns 0.0 for experts that have never been encountered
-    pub fn get_probability(&self, expert: AbstractExpert) -> f64 {
-        self.ewma_values
-            .get(expert.layer_id, expert.expert_id)
-            .unwrap_or(0.0)
-    }
-
-    /// Get EWMA probability estimates for all experts in a specific layer
-    pub fn get_layer_probabilities(&self, layer_id: usize) -> Vec<crate::Probability> {
-        if layer_id >= self.config.total_layers {
-            return vec![None; self.config.experts_per_layer];
-        }
-
-        let mut layer_probs = Vec::new();
-        for expert_id in 0..self.config.experts_per_layer {
-            let prob = self.ewma_values.get(layer_id, expert_id);
-            layer_probs.push(prob);
-        }
-
-        layer_probs
-    }
-
     /// Get all EWMA values as a reference to the internal ExpertProbability
-    pub fn get_all_probabilities(&self) -> &ExpertProbability {
+    pub fn get_probabilities(&self) -> &ExpertProbability {
         &self.ewma_values
     }
 
