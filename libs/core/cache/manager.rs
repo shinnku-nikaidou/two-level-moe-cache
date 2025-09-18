@@ -34,6 +34,10 @@ pub struct RustTwoTierWmExpertCacheManager {
 
     /// Watermark algorithm for cache decisions
     pub(crate) watermark_algorithm: WatermarkAlgorithm,
+
+    /// Cache of currently activated experts for the current layer
+    /// Used to force these experts to VRAM tier during experts_status() calls
+    pub(crate) current_activated_experts: Vec<usize>,
 }
 
 impl RustTwoTierWmExpertCacheManager {
@@ -93,6 +97,7 @@ impl RustTwoTierWmExpertCacheManager {
             scoutgate_predictor,
             probability_fuser,
             watermark_algorithm,
+            current_activated_experts: Vec::new(),
         })
     }
 }

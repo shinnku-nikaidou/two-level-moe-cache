@@ -18,6 +18,15 @@ impl RustExpertParamType {
     pub const MLP1_BIAS: RustExpertParamType = RustExpertParamType { value: 1 };
     pub const MLP2_WEIGHT: RustExpertParamType = RustExpertParamType { value: 2 };
     pub const MLP2_BIAS: RustExpertParamType = RustExpertParamType { value: 3 };
+
+    /// All parameter types for each expert (all 4 MLP parameters)
+    /// Used for iterating over all parameter types when generating expert status
+    pub const ALL_PARAM_TYPES: [RustExpertParamType; 4] = [
+        Self::MLP1_WEIGHT,
+        Self::MLP1_BIAS,
+        Self::MLP2_WEIGHT,
+        Self::MLP2_BIAS,
+    ];
 }
 
 #[pymethods]
