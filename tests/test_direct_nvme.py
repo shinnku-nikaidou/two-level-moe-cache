@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
-import sys
 import os
+import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.domain.manager.direct_nvme import DirectNVMEExpertCacheManager
-from src.domain import ModelType
 from src.common.types import ExpertKey, ExpertParamType
+from src.domain import ModelType
+from src.domain.manager.direct_nvme import DirectNVMEExpertCacheManager
 
 
 def test_direct_nvme_shared_experts():

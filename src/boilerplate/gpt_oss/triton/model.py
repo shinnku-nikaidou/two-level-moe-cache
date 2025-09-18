@@ -8,7 +8,7 @@ from torch.profiler import record_function
 from ..model import ModelConfig, RMSNorm
 from ..weights import Checkpoint
 from .attention import attention, attention_ref
-from .moe import quantize_mx4, moe
+from .moe import moe, quantize_mx4
 
 
 class RotaryEmbedding(torch.nn.Module):

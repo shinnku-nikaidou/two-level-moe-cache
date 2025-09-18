@@ -3,6 +3,7 @@ Configuration management for expert caching system.
 """
 
 import torch
+
 from .cache_config import CacheConfig
 
 # Global device configuration

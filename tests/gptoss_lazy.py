@@ -4,16 +4,17 @@ Test for LazyTransformer with lazy MoE expert loading
 """
 import os
 import sys
-import torch
 import traceback
+
+import torch
+
+from src.boilerplate.gpt_oss.tokenizer import get_tokenizer
+from src.domain import ModelType
+from src.domain.gpt_oss.model import LazyTransformer
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_dir)
 sys.path.insert(0, project_root)
-
-from src.domain.gpt_oss.model import LazyTransformer
-from src.domain import ModelType
-from src.boilerplate.gpt_oss.tokenizer import get_tokenizer
 
 MODEL_PATH = os.path.join(project_root, "data", "models", "gpt-oss-20b", "original")
 

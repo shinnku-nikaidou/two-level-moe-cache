@@ -2,9 +2,10 @@
 """
 Fixed CPU test for gpt-oss compatibility
 """
+import json
 import os
 import sys
-import json
+
 import torch
 
 # Ensure CUDA is not available
@@ -14,9 +15,9 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_dir)
 sys.path.insert(0, project_root)
 
-from src.boilerplate.gpt_oss.model import Transformer, ModelConfig
-from src.boilerplate.gpt_oss.weights import Checkpoint
+from src.boilerplate.gpt_oss.model import ModelConfig, Transformer
 from src.boilerplate.gpt_oss.tokenizer import get_tokenizer
+from src.boilerplate.gpt_oss.weights import Checkpoint
 
 # Use relative path to model
 MODEL_PATH = os.path.join(project_root, "data", "models", "gpt-oss-20b", "original")

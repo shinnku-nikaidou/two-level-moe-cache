@@ -5,23 +5,21 @@ This module provides integrated model classes that combine boilerplate
 components with domain-specific optimizations like expert caching.
 """
 
-import os
 import json
-import torch
+import os
 from typing import Optional
 
-from src.boilerplate.gpt_oss.model import (
-    ModelConfig,
-    AttentionBlock,
-    RMSNorm,
-)
+import torch
+
+from src.boilerplate.gpt_oss.model import AttentionBlock, ModelConfig, RMSNorm
 from src.boilerplate.gpt_oss.weights import Checkpoint
-from src.domain.cache.interfaces.expert_cache import IExpertCacheManager
-from src.services.cache import ExpertCacheFactory
+from src.config import TORCH_VRAM_DEVICE
 from src.config.util import get_checkpoint_path
 from src.domain import ModelType
+from src.domain.cache.interfaces.expert_cache import IExpertCacheManager
 from src.domain.manager import CacheManagerType
-from src.config import TORCH_VRAM_DEVICE
+from src.services.cache import ExpertCacheFactory
+
 from .moe import LazyMLPBlock
 
 

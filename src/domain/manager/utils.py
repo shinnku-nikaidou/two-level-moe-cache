@@ -5,12 +5,10 @@ This module provides common utility functions for converting between
 Python and Rust types used in cache managers.
 """
 
+# Import the Rust types
+from rust_core import RustExpertKey, RustExpertParamType
 from src.common.types import ExpertKey, ExpertParamType
 from src.domain import ModelType
-
-# Import the Rust types
-from rust_core import RustExpertKey
-from rust_core import RustExpertParamType
 
 
 def python_to_rust_key(key: ExpertKey) -> RustExpertKey:

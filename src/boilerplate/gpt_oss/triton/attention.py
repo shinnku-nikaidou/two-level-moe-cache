@@ -8,7 +8,6 @@ This version has been extended to support banded attention and learned attention
 
 import pytest
 import torch
-
 import triton
 import triton.language as tl
 from triton.tools.tensor_descriptor import TensorDescriptor

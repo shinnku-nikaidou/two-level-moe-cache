@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
-import sys
 import os
+import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.domain.manager.lru import LRUExpertCacheManager
+from src.common.types import ExpertKey, ExpertParamType
 from src.domain import ModelType
-from src.domain.cache.entities.types import ExpertKey, ExpertParamType
+from src.domain.manager.lru import LRUExpertCacheManager
 
 
 def test_lru_shared_experts():

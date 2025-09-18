@@ -5,13 +5,16 @@ This module provides an LRU (Least Recently Used) cache implementation for
 managing expert weights with integrated memory tier tracking and eviction.
 """
 
-import torch
 from collections import OrderedDict
 from typing import Dict, List, Optional, Set
-from ..cache.interfaces.expert_cache import IExpertCacheManager
-from ..cache.entities.expert import Expert
+
+import torch
+
 from src.common.types import ExpertKey, MemoryTier
+
 from .. import ModelType
+from ..cache.entities.expert import Expert
+from ..cache.interfaces.expert_cache import IExpertCacheManager
 
 
 class LRUExpertCacheManager(IExpertCacheManager):

@@ -3,8 +3,8 @@ Expert weight loading adapters.
 """
 
 from .base import ExpertAdapter
-from .gptoss import GPTOSSExpertAdapter
 from .factory import AdapterFactory
+from .gptoss import GPTOSSExpertAdapter
 
 __all__ = [
     "ExpertAdapter",

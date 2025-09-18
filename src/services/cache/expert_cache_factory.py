@@ -5,16 +5,15 @@ This module provides factory methods for creating different types of expert
 cache implementations with appropriate configuration and dependencies.
 """
 
-from typing import Optional, Dict
+from typing import Dict, Optional
+
 from src.config.cache_config import CacheConfig
-from src.domain.cache.interfaces.expert_cache import IExpertCacheManager
-from src.domain.manager import (
-    LRUExpertCacheManager,
-    DirectNVMEExpertCacheManager,
-    DirectRAMExpertCacheManager,
-    TwoTierWmExpertCacheManager,
-)
 from src.domain import ModelType
+from src.domain.cache.interfaces.expert_cache import IExpertCacheManager
+from src.domain.manager import (DirectNVMEExpertCacheManager,
+                                DirectRAMExpertCacheManager,
+                                LRUExpertCacheManager,
+                                TwoTierWmExpertCacheManager)
 
 
 class ExpertCacheFactory:

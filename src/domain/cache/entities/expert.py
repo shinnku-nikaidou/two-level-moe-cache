@@ -3,13 +3,14 @@ Core entities for expert weight caching system.
 """
 
 from typing import Optional
+
 import torch
 
-from src.domain import ModelType
-from src.adapters.expert.factory import AdapterFactory
 from src.adapters.expert.base import ExpertAdapter
-from src.config import TORCH_VRAM_DEVICE, TORCH_RAM_DEVICE
+from src.adapters.expert.factory import AdapterFactory
 from src.common.types import ExpertKey, MemoryTier
+from src.config import TORCH_RAM_DEVICE, TORCH_VRAM_DEVICE
+from src.domain import ModelType
 
 
 class Expert:

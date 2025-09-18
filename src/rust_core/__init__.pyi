@@ -6,8 +6,8 @@ Updated during policy layer integration to include watermark debugging methods.
 All Rust PyClass exports now have "Rust" prefix for clear namespace separation.
 """
 
-from typing import List
 from enum import IntEnum
+from typing import List
 
 class RustMemoryTier(IntEnum):
     """Memory tier enumeration for expert storage locations."""

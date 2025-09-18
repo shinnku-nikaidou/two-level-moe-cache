@@ -6,12 +6,14 @@ for watermark-based expert caching with dual-tier memory management.
 """
 
 from typing import List
-from ..cache.interfaces.expert_cache import IExpertCacheManager
-from ..cache.entities.expert import Expert
-from src.common.types import ExpertKey, MemoryTier, ExpertParamType
-from .. import ModelType
-from .utils import rust_model_type
+
 from rust_core import RustTwoTierWmExpertCacheManager
+from src.common.types import ExpertKey, ExpertParamType, MemoryTier
+
+from .. import ModelType
+from ..cache.entities.expert import Expert
+from ..cache.interfaces.expert_cache import IExpertCacheManager
+from .utils import rust_model_type
 
 
 class TwoTierWmExpertCacheManager(IExpertCacheManager):

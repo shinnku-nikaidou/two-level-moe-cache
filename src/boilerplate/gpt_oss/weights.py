@@ -4,7 +4,6 @@ import os
 import torch
 from safetensors import safe_open
 
-
 # Bytes per MXFP4 block: 32 FP4 numbers packed in 16 bytes
 BYTES_PER_BLOCK = 16
 

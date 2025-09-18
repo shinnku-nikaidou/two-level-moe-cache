@@ -8,14 +8,15 @@ This test validates that DirectRAM correctly:
 3. Maintains RAM cache while providing VRAM computation copies
 """
 
-import sys
 import os
+import sys
+
 from src.common.types import ExpertKey, ExpertParamType
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.domain.manager.direct_ram import DirectRAMExpertCacheManager
 from src.domain import ModelType
+from src.domain.manager.direct_ram import DirectRAMExpertCacheManager
 
 # Global cache instance - shared across all tests to avoid multiple pre-warming
 _shared_cache = None

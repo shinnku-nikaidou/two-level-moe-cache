@@ -7,10 +7,11 @@ No persistence, no LRU management - maximum simplicity for maximum performance.
 """
 
 from typing import List, Set
-from src.domain.cache.interfaces.expert_cache import IExpertCacheManager
-from src.domain.cache.entities.expert import Expert
+
 from src.common.types import ExpertKey
 from src.domain import ModelType
+from src.domain.cache.entities.expert import Expert
+from src.domain.cache.interfaces.expert_cache import IExpertCacheManager
 
 
 class DirectNVMEExpertCacheManager(IExpertCacheManager):

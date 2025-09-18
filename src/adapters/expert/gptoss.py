@@ -3,10 +3,12 @@ GPT-OSS model expert weight adapter.
 """
 
 import torch
+
 from src.boilerplate.gpt_oss.weights import Checkpoint
 from src.common.types import ExpertKey, ExpertParamType
-from src.domain import ModelType
 from src.config.util import get_checkpoint_path
+from src.domain import ModelType
+
 from .base import ExpertAdapter
 
 

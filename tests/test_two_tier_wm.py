@@ -6,8 +6,8 @@ This script tests the basic functionality of the two-tier watermark cache
 manager including imports, initialization, and basic operations.
 """
 
-import sys
 import os
+import sys
 
 # Add src to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -17,8 +17,7 @@ def test_rust_imports():
     """Test if Rust core library can be imported."""
     print("=== Testing Rust Core Imports ===")
 
-    from rust_core import RustTwoTierWmExpertCacheManager
-    from rust_core import RustExpertKey
+    from rust_core import RustExpertKey, RustTwoTierWmExpertCacheManager
 
     print("✅ Rust core library imported successfully")
     return True

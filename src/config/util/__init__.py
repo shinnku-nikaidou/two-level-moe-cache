@@ -3,6 +3,7 @@ Configuration utilities for model checkpoint path resolution.
 """
 
 import os
+
 from ...domain import ModelType
 
 

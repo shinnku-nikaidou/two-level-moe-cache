@@ -2,16 +2,17 @@
 Unit tests for Expert class and caching entities.
 """
 
-import sys
 import os
-import torch
+import sys
+
 import pytest
+import torch
 
 # Add src to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from src.domain.cache.entities import Expert, ExpertKey, MemoryTier
 from src.domain import ModelType
+from src.domain.cache.entities import Expert, ExpertKey, MemoryTier
 
 
 class TestExpertKey:

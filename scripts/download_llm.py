@@ -2,9 +2,9 @@
 
 # Script to download GPT-OSS models from Hugging Face
 # usage: python scripts/download_llm.py
-from huggingface_hub import snapshot_download
 import os
 
+from huggingface_hub import snapshot_download
 
 REPO_ID = "openai/gpt-oss-20b"
 DEST = os.path.join(os.path.dirname(__file__), "..", "data", "models", "gpt-oss-20b")
