@@ -27,8 +27,8 @@ class CPUTokenGenerator:
     """Fixed CPU version of TokenGenerator"""
 
     @torch.inference_mode()
-    def __init__(self, checkpoint: str, device: torch.device):
-        self.device = device
+    def __init__(self, checkpoint: str):
+        self.device = torch.device("cpu")
         self.model = self._load_model_cpu(checkpoint)
 
     def _load_model_cpu(self, path: str) -> Transformer:
@@ -104,10 +104,7 @@ def test_cpu_generation():
     print("CPU TokenGenerator Test")
     print("=" * 60)
 
-    device = torch.device("cpu")
-    print(f"Using device: {device}")
-
-    generator = CPUTokenGenerator(MODEL_PATH, device=device)
+    generator = CPUTokenGenerator(MODEL_PATH)
 
     # Get tokenizer
     tokenizer = get_tokenizer()

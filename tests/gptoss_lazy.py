@@ -8,76 +8,15 @@ import traceback
 
 import torch
 
-from src.boilerplate.gpt_oss.tokenizer import get_tokenizer
-from src.domain import ModelType
-from src.domain.gpt_oss.model import LazyTransformer
-
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_dir)
 sys.path.insert(0, project_root)
 
+from src.boilerplate.gpt_oss.tokenizer import get_tokenizer
+from src.domain import ModelType
+from src.domain.gpt_oss.generator import LazyTokenGenerator
+
 MODEL_PATH = os.path.join(project_root, "data", "models", "gpt-oss-20b", "original")
-
-
-class LazyTokenGenerator:
-    """LazyTransformer version of TokenGenerator"""
-
-    @torch.inference_mode()
-    def __init__(self, model_type: ModelType, device: torch.device):
-        self.device = device
-        self.model = self._load_lazy_model(model_type)
-
-    def _load_lazy_model(self, model_type: ModelType) -> LazyTransformer:
-        """Load LazyTransformer with lazy expert loading"""
-        model = LazyTransformer.from_model_type(model_type)
-        model.eval()
-        return model
-
-    @torch.inference_mode()
-    def generate(
-        self,
-        prompt_tokens: list[int],
-        stop_tokens: list[int],
-        temperature: float = 1.0,
-        max_tokens: int = 0,
-        return_logprobs: bool = False,
-    ):
-        tokens = list(prompt_tokens)
-        num_generated_tokens = 0
-        while max_tokens == 0 or num_generated_tokens < max_tokens:
-            # Only pass the last context_length tokens to avoid memory issues
-            context_length = 4096
-            input_tokens = (
-                tokens[-context_length:] if len(tokens) > context_length else tokens
-            )
-
-            # Use full context like the working gptoss_cpu_boil.py
-            logits = self.model(
-                torch.as_tensor(input_tokens, dtype=torch.int32, device=self.device)
-            )[
-                -1
-            ]  # Take logits for the last position
-
-            if temperature == 0.0:
-                predicted_token = torch.argmax(logits, dim=-1).item()
-            else:
-                probs = torch.softmax(logits * (1.0 / temperature), dim=-1)
-                predicted_token = torch.multinomial(probs, num_samples=1).item()
-
-            tokens.append(predicted_token)  # pyright: ignore[reportArgumentType]
-            num_generated_tokens += 1
-
-            if return_logprobs:
-                logprobs = torch.log_softmax(logits, dim=-1)
-                selected_logprobs = logprobs[
-                    predicted_token
-                ].item()  # pyright: ignore[reportArgumentType]
-                yield predicted_token, selected_logprobs
-            else:
-                yield predicted_token
-
-            if predicted_token in stop_tokens:
-                break
 
 
 def test_lazy_generation():
@@ -107,19 +46,27 @@ def test_lazy_generation():
 
         try:
             # Generate just a few tokens to test
-            for i, token_or_tuple in enumerate(
+            for i, result in enumerate(
                 generator.generate(
                     tokens,
                     stop_tokens=[tokenizer.eot_token],
                     temperature=temp,
-                    max_tokens=30,  # Only generate 3 tokens to test
+                    max_tokens=30,  # Only generate 30 tokens to test
                     return_logprobs=(temp > 0),
                 )
             ):
-                token, logprob = token_or_tuple
-                token_text = tokenizer.decode([token])
-                print(f"  Token {i+1}: {repr(token_text)} (logprob: {logprob:.3f})")
-                generated_tokens.append(token)
+                if temp > 0 and isinstance(result, tuple):
+                    token, logprob = result
+                    assert isinstance(token, int), f"Expected int, got {type(token)}"
+                    token_text = tokenizer.decode([token])
+                    print(f"  Token {i+1}: {repr(token_text)} (logprob: {logprob:.3f})")
+                    generated_tokens.append(token)
+                else:
+                    token = result
+                    assert isinstance(token, int), f"Expected int, got {type(token)}"
+                    token_text = tokenizer.decode([token])
+                    print(f"  Token {i+1}: {repr(token_text)}")
+                    generated_tokens.append(token)
 
                 if i >= 5:  # Stop after 5 tokens
                     break
