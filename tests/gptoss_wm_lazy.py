@@ -6,7 +6,7 @@ import os
 import sys
 import traceback
 from datetime import datetime
-
+import gc
 import torch
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -78,6 +78,8 @@ def test_lazy_generation():
 
                 if i >= 50:  # Stop after 50 tokens
                     break
+                
+                gc.collect()
 
             # Decode full text
             full_text = tokenizer.decode(tokens + generated_tokens)
