@@ -8,6 +8,7 @@ from src.domain import ModelType
 
 from .base import ExpertAdapter
 from .gptoss import GPTOSSExpertAdapter
+from .gptoss20bfast import GPTOSS20bFastExpertAdapter
 
 
 class AdapterFactory:
@@ -15,7 +16,7 @@ class AdapterFactory:
 
     # Registry mapping model types to adapter classes
     _ADAPTER_REGISTRY: Dict[ModelType, Type[ExpertAdapter]] = {
-        ModelType.GPT_OSS_20B: GPTOSSExpertAdapter,
+        ModelType.GPT_OSS_20B: GPTOSS20bFastExpertAdapter,
         ModelType.GPT_OSS_120B: GPTOSSExpertAdapter,
     }
 

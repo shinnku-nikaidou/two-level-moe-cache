@@ -100,20 +100,16 @@ class ExpertCacheFactory:
     def create_two_tier_wm_cache_manager(
         cls,
         model_type: ModelType,
-        vram_capacity_mb: int = 5120,
-        ram_capacity_mb: int = 20480,
-        **kwargs,
+        vram_cap: int = 5120,
+        ram_cap: int = 25600,
     ) -> IExpertCacheManager:
         """
         Create a Two-Tier Watermark expert cache.
 
         Args:
             model_type: Type of model
-            vram_capacity_mb: VRAM capacity limit in MB
-            ram_capacity_mb: RAM capacity limit in MB
-            vram_learning_rate: Learning rate for VRAM watermark updates
-            ram_learning_rate: Learning rate for RAM watermark updates
-            **kwargs: Additional configuration parameters
+            vram_cap: VRAM capacity limit in MB
+            ram_cap: RAM capacity limit in MB
 
         Returns:
             Two-tier watermark cache manager
@@ -123,7 +119,6 @@ class ExpertCacheFactory:
         """
         return TwoTierWmExpertCacheManager(
             model_type=model_type,
-            vram_capacity_mb=vram_capacity_mb,
-            ram_capacity_mb=ram_capacity_mb,
-            **kwargs,
+            vram_cap=vram_cap,
+            ram_cap=ram_cap,
         )

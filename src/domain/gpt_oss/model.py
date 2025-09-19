@@ -145,7 +145,7 @@ class LazyTransformer(torch.nn.Module):
     @staticmethod
     def from_model_type(
         model_type: ModelType, 
-        cache_manager_type: CacheManagerType = CacheManagerType.DIRECT_RAM
+        cache_manager_type: CacheManagerType
     ) -> "LazyTransformer":
         """
         Load transformer from model type with lazy loading.

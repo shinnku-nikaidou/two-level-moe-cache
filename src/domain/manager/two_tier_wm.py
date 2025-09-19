@@ -31,19 +31,14 @@ class TwoTierWmExpertCacheManager(IExpertCacheManager):
     - Benefit density-based caching decisions
     """
 
-    def __init__(
-        self,
-        model_type: ModelType,
-        vram_capacity_mb: int = 5120,
-        ram_capacity_mb: int = 51200,
-    ):
+    def __init__(self, model_type: ModelType, vram_cap: int, ram_cap: int):
         """
         Initialize two-tier watermark cache manager.
 
         Args:
             model_type: Type of model for configuration
-            vram_capacity_mb: VRAM capacity limit in MB
-            ram_capacity_mb: RAM capacity limit in MB
+            vram_cap: VRAM capacity limit in MB
+            ram_cap: RAM capacity limit in MB
         """
         super().__init__(model_type)
 
@@ -54,7 +49,7 @@ class TwoTierWmExpertCacheManager(IExpertCacheManager):
         # Note: Using positional args to match Rust #[new] signature:
         # (model_type, total_layers, vram_capacity, ram_capacity)
         self._rust_cache = RustTwoTierWmExpertCacheManager(
-            rust_model_type(model_type), vram_capacity_mb, ram_capacity_mb
+            rust_model_type(model_type), vram_cap, ram_cap
         )
 
     def update_activations(self, activated_experts: List[int]) -> None:

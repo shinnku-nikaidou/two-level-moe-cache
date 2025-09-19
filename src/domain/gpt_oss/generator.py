@@ -27,7 +27,7 @@ class LazyTokenGenerator:
         self,
         model_type: ModelType,
         device: torch.device,
-        cache_manager_type: CacheManagerType = CacheManagerType.DIRECT_RAM,
+        cache_manager_type: CacheManagerType,
     ):
         """
         Initialize lazy token generator.
