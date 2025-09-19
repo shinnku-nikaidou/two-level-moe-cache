@@ -118,7 +118,7 @@ impl RustTwoTierWmExpertCacheManager {
             timer.current_layer()
         };
 
-        info!(
+        debug!(
             "current_activated_experts: {:?}",
             self.current_activated_experts
         );

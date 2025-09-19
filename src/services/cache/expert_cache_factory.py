@@ -100,8 +100,8 @@ class ExpertCacheFactory:
     def create_two_tier_wm_cache_manager(
         cls,
         model_type: ModelType,
-        vram_cap: int = 5120,
-        ram_cap: int = 25600,
+        vram_cap: int = 2560,
+        ram_cap: int = 51200,
     ) -> IExpertCacheManager:
         """
         Create a Two-Tier Watermark expert cache.

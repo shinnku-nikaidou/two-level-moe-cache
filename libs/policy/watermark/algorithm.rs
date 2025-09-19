@@ -526,7 +526,7 @@ impl WatermarkAlgorithm {
             }
         }
 
-        info!(
+        debug!(
             "Updated watermarks: VRAM = {:.4}, RAM = {:.4}",
             self.vram_watermark, self.ram_watermark
         );
