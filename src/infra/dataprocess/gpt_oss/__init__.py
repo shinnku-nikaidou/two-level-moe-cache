@@ -11,14 +11,14 @@ Total files for GPT-OSS-20B: 24 layers × 32 experts × 4 params = 3072 files
 import json
 import os
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 import torch
-from safetensors.torch import save_file, load_file
+from safetensors.torch import load_file, save_file
 from tqdm import tqdm
 
 from src.boilerplate.gpt_oss.weights import Checkpoint
-from src.common.types import ExpertParamType, ExpertKey
+from src.common.types import ExpertKey, ExpertParamType
 from src.domain import ModelType
 
 

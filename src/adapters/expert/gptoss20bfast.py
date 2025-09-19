@@ -7,7 +7,7 @@ decoding overhead, with fallback to original MXFP4 decoding for compatibility.
 
 import json
 from pathlib import Path
-from typing import Dict, Optional, Any
+from typing import Any, Dict, Optional
 
 import torch
 from safetensors.torch import load_file

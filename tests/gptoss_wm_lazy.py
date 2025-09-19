@@ -5,6 +5,7 @@ Test for LazyTransformer with lazy MoE expert loading
 import os
 import sys
 import traceback
+from datetime import datetime
 
 import torch
 
@@ -39,7 +40,7 @@ def test_lazy_generation():
     tokenizer = get_tokenizer()
 
     # Test simple prompts
-    prompts = ["Hello", "The capital of France is", "114514, ", "rust lang"]
+    prompts = ["Hello", "The capital of France is", "large language model mixture of expert", "rust lang"]
 
     for prompt in prompts:
         print(f"\nInput: '{prompt}'")
@@ -60,20 +61,22 @@ def test_lazy_generation():
                     return_logprobs=(temp > 0),
                 )
             ):
+                now = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
                 if temp > 0 and isinstance(result, tuple):
                     token, logprob = result
                     assert isinstance(token, int), f"Expected int, got {type(token)}"
                     token_text = tokenizer.decode([token])
-                    print(f"  Token {i+1}: {repr(token_text)} (logprob: {logprob:.3f})")
+                    
+                    print(f"  Token {i+1}: {repr(token_text)} (logprob: {logprob:.3f}) {now}")
                     generated_tokens.append(token)
                 else:
                     token = result
                     assert isinstance(token, int), f"Expected int, got {type(token)}"
                     token_text = tokenizer.decode([token])
-                    print(f"  Token {i+1}: {repr(token_text)}")
+                    print(f"  Token {i+1}: {repr(token_text)}  {now}")
                     generated_tokens.append(token)
 
-                if i >= 200:  # Stop after 5 tokens
+                if i >= 50:  # Stop after 50 tokens
                     break
 
             # Decode full text

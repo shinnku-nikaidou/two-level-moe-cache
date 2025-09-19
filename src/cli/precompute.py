@@ -13,12 +13,10 @@ from typing import Optional
 
 import torch
 
-from src.infra.dataprocess.gpt_oss import (
-    precompute_gpt_oss_20b,
-    validate_precomputed_gpt_oss_20b,
-    get_precomputed_storage_stats,
-    is_precomputed_available,
-)
+from src.infra.dataprocess.gpt_oss import (get_precomputed_storage_stats,
+                                           is_precomputed_available,
+                                           precompute_gpt_oss_20b,
+                                           validate_precomputed_gpt_oss_20b)
 
 
 def cmd_precompute(args) -> int:

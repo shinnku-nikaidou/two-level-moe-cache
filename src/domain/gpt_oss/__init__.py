@@ -6,19 +6,12 @@ on-demand loading capabilities to reduce memory usage.
 """
 
 # Re-export essential boilerplate components
-from ...boilerplate.gpt_oss.model import (
-    AttentionBlock,
-    ModelConfig,
-    RMSNorm,
-    TokenGenerator,
-    TransformerBlock,
-    swiglu,
-)
-
+from ...boilerplate.gpt_oss.model import (AttentionBlock, ModelConfig, RMSNorm,
+                                          TokenGenerator, TransformerBlock,
+                                          swiglu)
 # Re-export utilities
 from ...boilerplate.gpt_oss.weights import Checkpoint
 from .model import LazyTokenGenerator, LazyTransformer, LazyTransformerBlock
-
 # Domain implementations
 from .moe import LazyExpertTensor, LazyMLPBlock
 

@@ -10,12 +10,10 @@ from typing import Dict, Optional
 from src.config.cache_config import CacheConfig
 from src.domain import ModelType
 from src.domain.cache.interfaces.expert_cache import IExpertCacheManager
-from src.domain.manager import (
-    DirectNVMEExpertCacheManager,
-    DirectRAMExpertCacheManager,
-    LRUExpertCacheManager,
-    TwoTierWmExpertCacheManager,
-)
+from src.domain.manager import (DirectNVMEExpertCacheManager,
+                                DirectRAMExpertCacheManager,
+                                LRUExpertCacheManager,
+                                TwoTierWmExpertCacheManager)
 
 
 class ExpertCacheFactory:
@@ -100,7 +98,7 @@ class ExpertCacheFactory:
     def create_two_tier_wm_cache_manager(
         cls,
         model_type: ModelType,
-        vram_cap: int = 2560,
+        vram_cap: int = 5120,
         ram_cap: int = 51200,
     ) -> IExpertCacheManager:
         """

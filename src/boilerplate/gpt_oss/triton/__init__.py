@@ -7,15 +7,8 @@ This module contains high-performance implementations of:
 """
 
 from .attention import attention, attention_ref
-from .model import (
-    AttentionBlock,
-    Cache,
-    MLPBlock,
-    RotaryEmbedding,
-    TokenGenerator,
-    Transformer,
-    TransformerBlock,
-)
+from .model import (AttentionBlock, Cache, MLPBlock, RotaryEmbedding,
+                    TokenGenerator, Transformer, TransformerBlock)
 from .moe import moe, quantize_mx4, swiglu
 
 __all__ = [
