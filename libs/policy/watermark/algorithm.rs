@@ -516,7 +516,7 @@ impl WatermarkAlgorithm {
             // RAM watermark update: λ_R ← [λ_R + η_R(usage_R - K_R)]₊
             let new_ram_watermark = (self.ram_watermark
                 + self.ram_learning_rate * (ram_usage - self.ram_capacity))
-                .max(0.0);
+                .max(-0.01);
 
             self.ram_watermark = new_ram_watermark;
 

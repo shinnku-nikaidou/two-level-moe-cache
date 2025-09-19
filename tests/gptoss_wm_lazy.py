@@ -30,9 +30,9 @@ def test_lazy_generation():
 
     # Load LazyTransformer with TWO_TIER_WM cache
     generator = LazyTokenGenerator(
-        ModelType.GPT_OSS_20B, 
-        device=device, 
-        cache_manager_type=CacheManagerType.TWO_TIER_WM
+        ModelType.GPT_OSS_20B,
+        device=device,
+        cache_manager_type=CacheManagerType.TWO_TIER_WM,
     )
 
     # Get tokenizer
@@ -56,7 +56,7 @@ def test_lazy_generation():
                     tokens,
                     stop_tokens=[tokenizer.eot_token],
                     temperature=temp,
-                    max_tokens=30,  # Only generate 30 tokens to test
+                    max_tokens=200,  # Only generate 200 tokens to test
                     return_logprobs=(temp > 0),
                 )
             ):
@@ -73,7 +73,7 @@ def test_lazy_generation():
                     print(f"  Token {i+1}: {repr(token_text)}")
                     generated_tokens.append(token)
 
-                if i >= 5:  # Stop after 5 tokens
+                if i >= 200:  # Stop after 5 tokens
                     break
 
             # Decode full text

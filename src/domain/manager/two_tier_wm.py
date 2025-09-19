@@ -35,7 +35,7 @@ class TwoTierWmExpertCacheManager(IExpertCacheManager):
         self,
         model_type: ModelType,
         vram_capacity_mb: int = 5120,
-        ram_capacity_mb: int = 20480,
+        ram_capacity_mb: int = 51200,
     ):
         """
         Initialize two-tier watermark cache manager.
