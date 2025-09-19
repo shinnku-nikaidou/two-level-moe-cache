@@ -10,10 +10,12 @@ from typing import Dict, Optional
 from src.config.cache_config import CacheConfig
 from src.domain import ModelType
 from src.domain.cache.interfaces.expert_cache import IExpertCacheManager
-from src.domain.manager import (DirectNVMEExpertCacheManager,
-                                DirectRAMExpertCacheManager,
-                                LRUExpertCacheManager,
-                                TwoTierWmExpertCacheManager)
+from src.domain.manager import (
+    DirectNVMEExpertCacheManager,
+    DirectRAMExpertCacheManager,
+    LRUExpertCacheManager,
+    TwoTierWmExpertCacheManager,
+)
 
 
 class ExpertCacheFactory:

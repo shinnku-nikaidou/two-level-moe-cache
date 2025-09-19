@@ -2,15 +2,22 @@ import torch
 import triton_kernels
 import triton_kernels.swiglu
 from torch.profiler import record_function
-from triton_kernels.matmul_ogs import (FlexCtx, FnSpecs, FusedActivation,
-                                       PrecisionConfig, matmul_ogs)
+from triton_kernels.matmul_ogs import (
+    FlexCtx,
+    FnSpecs,
+    FusedActivation,
+    PrecisionConfig,
+    matmul_ogs,
+)
 from triton_kernels.numerics import InFlexData
 from triton_kernels.numerics_details.mxfp import downcast_to_mxfp
 from triton_kernels.routing import routing
 from triton_kernels.tensor import FP4, convert_layout, wrap_torch_tensor
-from triton_kernels.tensor_details.layout import (HopperMXScaleLayout,
-                                                  HopperMXValueLayout,
-                                                  StridedLayout)
+from triton_kernels.tensor_details.layout import (
+    HopperMXScaleLayout,
+    HopperMXValueLayout,
+    StridedLayout,
+)
 
 
 def quantize_mx4(w):

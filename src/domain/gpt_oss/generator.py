@@ -16,7 +16,7 @@ from .model import LazyTransformer
 class LazyTokenGenerator:
     """
     Token generator using LazyTransformer for memory-efficient inference.
-    
+
     This generator leverages the expert cache system to minimize memory usage
     during token generation, making it suitable for large models on
     resource-constrained hardware.
@@ -24,10 +24,10 @@ class LazyTokenGenerator:
 
     @torch.inference_mode()
     def __init__(
-        self, 
-        model_type: ModelType, 
-        device: torch.device, 
-        cache_manager_type: CacheManagerType = CacheManagerType.DIRECT_RAM
+        self,
+        model_type: ModelType,
+        device: torch.device,
+        cache_manager_type: CacheManagerType = CacheManagerType.DIRECT_RAM,
     ):
         """
         Initialize lazy token generator.

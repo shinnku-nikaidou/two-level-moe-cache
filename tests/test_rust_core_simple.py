@@ -10,8 +10,12 @@ def test_rust_core_basic():
 
     # Import all the Rust types
     try:
-        from rust_core import (RustExpertKey, RustExpertParamType,
-                               RustMemoryTier, RustTwoTierWmExpertCacheManager)
+        from rust_core import (
+            RustExpertKey,
+            RustExpertParamType,
+            RustMemoryTier,
+            RustTwoTierWmExpertCacheManager,
+        )
     except ImportError as e:
         print(f"❌ Failed to import Rust types: {e}")
         return False
