@@ -14,3 +14,7 @@ serde_json = { workspace = true }
 
 # Logging
 tracing = { workspace = true }
+
+# Deep learning framework for ScoutGate neural network components
+burn = "0.18"
+burn-ndarray = "0.18"
