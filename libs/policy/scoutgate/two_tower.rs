@@ -57,35 +57,38 @@ impl TwoTowerScorer {
         })
     }
     
-    /// Project context through context tower: d_h -> d'
+    /// Project context through context tower
+    ///
+    /// Input: context [batch_size, d_h]  
+    /// Output: projected context [batch_size, d']
     pub fn project_context(&self, context: Tensor<Backend, 2>) -> Result<Tensor<Backend, 2>, ScoutGateError> {
-        todo!("Implement context tower forward pass")
+        // Project context through the context tower
+        let projected = self.context_tower.forward(context);
+        Ok(projected)
     }
     
-    /// Compute similarity scores between context and experts
+    /// Compute similarity scores between projected context and expert embeddings
     ///
-    /// Input: context_embedding [batch_size, d'], expert_matrix [num_experts, d']
-    /// Output: similarity_scores [batch_size, num_experts]
+    /// Input: projected_context [batch_size, d'], expert_matrix [num_experts, d']
+    /// Output: similarity scores [batch_size, num_experts]
     pub fn compute_similarity_scores(
         &self,
-        context_embedding: Tensor<Backend, 2>,
+        projected_context: Tensor<Backend, 2>,
         expert_matrix: Tensor<Backend, 2>,
     ) -> Result<Tensor<Backend, 2>, ScoutGateError> {
-        todo!("Implement dot-product similarity computation")
-    }
-    
-    /// Add bias terms to similarity scores
-    pub fn add_bias(
-        &self,
-        scores: Tensor<Backend, 2>,
-        layer_id: usize,
-    ) -> Result<Tensor<Backend, 2>, ScoutGateError> {
-        todo!("Implement bias addition for layer-specific base rates")
+        // Compute dot product: context @ expert_matrix.T
+        // projected_context: [batch_size, d']
+        // expert_matrix: [num_experts, d'] -> transposed to [d', num_experts]
+        let transposed_expert = expert_matrix.transpose();
+        let scores = projected_context.matmul(transposed_expert);
+        Ok(scores)
     }
     
     /// Apply sigmoid activation to get probabilities
     pub fn apply_sigmoid(&self, scores: Tensor<Backend, 2>) -> Result<Tensor<Backend, 2>, ScoutGateError> {
-        todo!("Implement sigmoid activation for probability outputs")
+        // Apply sigmoid activation
+        let activated_scores = burn::tensor::activation::sigmoid(scores);
+        Ok(activated_scores)
     }
     
     /// Complete scoring pipeline for a layer
@@ -98,7 +101,24 @@ impl TwoTowerScorer {
         expert_matrix: Tensor<Backend, 2>,
         layer_id: usize,
     ) -> Result<Tensor<Backend, 2>, ScoutGateError> {
-        todo!("Implement complete expert scoring pipeline")
+        // Project context through context tower
+        let projected_context = self.project_context(context)?;
+        
+        // Compute similarity scores with expert embeddings
+        let raw_scores = self.compute_similarity_scores(projected_context, expert_matrix)?;
+        
+        // Add layer-specific bias if available
+        let biased_scores = if let Some(bias) = self.layer_biases.get(&layer_id) {
+            let expanded_bias = bias.clone().unsqueeze::<2>().expand([raw_scores.shape().dims[0], bias.shape().dims[0]]);
+            raw_scores + expanded_bias
+        } else {
+            raw_scores
+        };
+        
+        // Apply sigmoid activation to get probabilities
+        let probabilities = self.apply_sigmoid(biased_scores)?;
+        
+        Ok(probabilities)
     }
     
     /// Batch scoring for multiple layers
@@ -110,16 +130,26 @@ impl TwoTowerScorer {
         expert_matrices: &[Tensor<Backend, 2>],
         layer_ids: &[usize],
     ) -> Result<Vec<Tensor<Backend, 2>>, ScoutGateError> {
-        todo!("Implement batch expert scoring across multiple layers")
+        let mut results = Vec::new();
+        
+        for (expert_matrix, &layer_id) in expert_matrices.iter().zip(layer_ids.iter()) {
+            let scores = self.score_experts(context.clone(), expert_matrix.clone(), layer_id)?;
+            results.push(scores);
+        }
+        
+        Ok(results)
     }
     
-    /// Initialize bias terms for a layer
+    /// Initialize bias vector for a layer
     pub fn initialize_layer_bias(
         &mut self,
         layer_id: usize,
         num_experts: usize,
     ) -> Result<(), ScoutGateError> {
-        todo!("Implement layer-specific bias initialization")
+        // Initialize zero bias vector for layer
+        let bias = Tensor::<Backend, 1>::zeros([num_experts], &self.device);
+        self.layer_biases.insert(layer_id, bias);
+        Ok(())
     }
     
     /// Update bias terms for a layer (for training)
@@ -128,20 +158,28 @@ impl TwoTowerScorer {
         layer_id: usize,
         new_bias: Tensor<Backend, 1>,
     ) -> Result<(), ScoutGateError> {
-        todo!("Implement bias update for training")
+        // Update bias vector for specific layer
+        self.layer_biases.insert(layer_id, new_bias);
+        Ok(())
     }
     
-    /// Get context tower weights (for inspection/training)
-    pub fn get_context_tower_weights(&self) -> &burn::nn::Linear<Backend> {
-        &self.context_tower
+    /// Get bias for layer (for inspection)
+    pub fn get_layer_bias(&self, layer_id: usize) -> Option<&Tensor<Backend, 1>> {
+        self.layer_biases.get(&layer_id)
     }
-    
-    /// Validate input dimensions
-    pub fn validate_scoring_inputs(
+
+    // Direct similarity computation for testing and validation
+    fn compute_raw_similarity(
         &self,
         context: &Tensor<Backend, 2>,
         expert_matrix: &Tensor<Backend, 2>,
-    ) -> Result<(), ScoutGateError> {
-        todo!("Implement input dimension validation for scoring")
+    ) -> Result<Tensor<Backend, 2>, ScoutGateError> {
+        // Project context first
+        let projected = self.project_context(context.clone())?;
+        
+        // Then compute similarity  
+        let scores = self.compute_similarity_scores(projected, expert_matrix.clone())?;
+        
+        Ok(scores)
     }
 }

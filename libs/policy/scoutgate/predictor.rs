@@ -137,7 +137,9 @@ impl ScoutGatePredictor {
 
     /// Update predictions using complete ScoutGate pipeline
     pub fn update_predictions(&mut self) -> Result<(), ScoutGateError> {
-        todo!("Implement complete ScoutGate inference pipeline")
+        // Run complete prediction pipeline for all layers
+        self.predict_all_layers()?;
+        Ok(())
     }
 
     /// Create ScoutGate predictor from model type
@@ -179,12 +181,86 @@ impl ScoutGatePredictor {
     /// 4. Score experts using two-tower architecture
     /// 5. Update predictions matrix
     pub fn predict_all_layers(&mut self) -> Result<(), ScoutGateError> {
-        todo!("Implement complete multi-layer prediction pipeline")
+        // Step 1: Process token context (using the method without arguments)
+        let token_context = self.token_processor.process_context()?;
+        
+        // Step 2: Process all layers simultaneously
+        for layer_id in 0..self.model_config.total_layers {
+            // Get layer embedding (returns Tensor<Backend, 1>)
+            let layer_embedding = self.layer_manager.get_layer_embedding(layer_id)?;
+            
+            // Convert 1D layer embedding to 2D for context processing
+            let layer_embedding_2d = layer_embedding.unsqueeze::<2>();
+            
+            // Process context (concatenate token and layer embeddings)
+            let processed_context = self.context_processor.process_context(
+                token_context.clone(),
+                layer_embedding_2d,
+            )?;
+            
+            // Get expert embeddings matrix for this layer
+            let expert_matrix = self.expert_store.get_precomputed_matrix(layer_id)?;
+            
+            // Score experts using two-tower architecture
+            let scores = self.two_tower_scorer.score_experts(
+                processed_context,
+                expert_matrix.clone(),
+                layer_id,
+            )?;
+            
+            // Extract scores and update predictions matrix
+            let scores_data = scores.to_data();
+            let scores_vec: Vec<f32> = scores_data.to_vec().unwrap();
+            
+            // Update predictions for this layer (using the correct method name)
+            for (expert_id, &score) in scores_vec.iter().enumerate() {
+                if expert_id < self.model_config.experts_per_layer {
+                    self.predictions.set(layer_id, expert_id, score as f64);
+                }
+            }
+        }
+        
+        Ok(())
     }
 
     /// Predict expert activations for a specific layer
-    pub fn predict_layer(&mut self, _layer_id: usize) -> Result<Vec<f64>, ScoutGateError> {
-        todo!("Implement single-layer prediction with validation")
+    pub fn predict_layer(&mut self, layer_id: usize) -> Result<Vec<f64>, ScoutGateError> {
+        // Validate layer ID
+        if layer_id >= self.model_config.total_layers {
+            return Err(ScoutGateError::LayerEmbeddingError { 
+                message: format!("Layer ID {} out of bounds (max: {})", layer_id, self.model_config.total_layers - 1) 
+            });
+        }
+        
+        // Step 1: Process token context
+        let token_context = self.token_processor.process_context()?;
+        
+        // Step 2: Get layer embedding
+        let layer_embedding = self.layer_manager.get_layer_embedding(layer_id)?;
+        let layer_embedding_2d = layer_embedding.unsqueeze::<2>();
+        
+        // Step 3: Process context
+        let processed_context = self.context_processor.process_context(
+            token_context,
+            layer_embedding_2d,
+        )?;
+        
+        // Step 4: Get expert embeddings matrix
+        let expert_matrix = self.expert_store.get_precomputed_matrix(layer_id)?;
+        
+        // Step 5: Score experts
+        let scores = self.two_tower_scorer.score_experts(
+            processed_context,
+            expert_matrix.clone(),
+            layer_id,
+        )?;
+        
+        // Step 6: Extract and return scores
+        let scores_data = scores.to_data();
+        let scores_vec: Vec<f32> = scores_data.to_vec().unwrap();
+        let result: Vec<f64> = scores_vec.iter().map(|&x| x as f64).collect();
+        
+        Ok(result)
     }
 
     /// Get activation probability predictions for all layers and experts
