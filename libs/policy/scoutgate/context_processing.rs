@@ -51,7 +51,7 @@ impl ContextProcessor {
         use_compression: bool,
         device: Device,
     ) -> Result<Self, ScoutGateError> {
-        let input_dim = context_window_size * d_proj + d_layer;
+        let input_dim = d_proj + d_layer;
         
         // Optional compression layer
         let context_compression = if use_compression {

@@ -30,17 +30,19 @@
 //!
 //! ```rust
 //! use policy::scoutgate::{ScoutGatePredictor, ScoutGateConfig};
+//! use policy::constants::ModelType;
 //! use policy::timer::Timer;
+//! use std::sync::{Arc, RwLock};
 //!
 //! // Create timer and predictor
-//! let timer = Timer::new(24); // 24 layers for GPT-OSS-20B
-//! let mut predictor = ScoutGatePredictor::from_model(&timer, ModelType::GptOss20B);
+//! let timer = Arc::new(RwLock::new(Timer::new()));
+//! let mut predictor = ScoutGatePredictor::from_model(timer, ModelType::SmallMoE);
 //!
-//! // Update with new token (placeholder)
-//! predictor.update_token_context(123)?;
+//! // Update with new token
+//! predictor.update_token_context(123).expect("Failed to update token context");
 //!
-//! // Get predictions for a layer
-//! let layer_probs = predictor.get_layer_probabilities(0);
+//! // Get predictions for all layers
+//! let probabilities = predictor.get_probabilities();
 //! ```
 
 pub mod config;
@@ -54,3 +56,8 @@ pub mod layer_embedding;
 pub mod context_processing;
 pub mod expert_embedding;
 pub mod two_tower;
+
+// Re-export main types for easier access
+pub use config::ScoutGateConfig;
+pub use error::ScoutGateError;
+pub use predictor::ScoutGatePredictor;
