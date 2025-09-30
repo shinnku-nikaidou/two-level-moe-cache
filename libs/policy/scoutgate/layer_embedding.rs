@@ -56,15 +56,15 @@ impl LayerEmbeddingManager {
 
     /// Get layer embedding for specific layer
     pub fn get_layer_embedding(&self, layer_id: usize) -> Result<Tensor<Backend, 1>, ScoutGateError> {
-        // 验证layer_id
+        // Validate layer_id
         self.validate_layer_id(layer_id)?;
         
-        // 从tensor中提取对应layer的embedding
+        // Extract corresponding layer embedding from tensor
         // layer_embeddings: [total_layers, d_layer]
-        // 我们需要取第layer_id行
+        // We need to take the layer_id-th row
         let embedding = self.layer_embeddings.clone().slice([layer_id..layer_id+1, 0..self.d_layer]);
         
-        // 将2D的[1, d_layer]压缩为1D的[d_layer]
+        // Squeeze 2D [1, d_layer] to 1D [d_layer]
         let embedding_1d = embedding.squeeze::<1>(0);
         
         Ok(embedding_1d)
@@ -72,19 +72,19 @@ impl LayerEmbeddingManager {
 
     /// Get batch of layer embeddings
     pub fn get_layer_embeddings_batch(&self, layer_ids: &[usize]) -> Result<Tensor<Backend, 2>, ScoutGateError> {
-        // 验证所有layer_ids
+        // Validate all layer_ids
         for &layer_id in layer_ids {
             self.validate_layer_id(layer_id)?;
         }
         
-        // 收集所有embeddings  
+        // Collect all embeddings  
         let mut embeddings = Vec::new();
         for &layer_id in layer_ids {
             let embedding = self.get_layer_embedding(layer_id)?;
             embeddings.push(embedding);
         }
         
-        // 将embeddings堆叠成batch tensor [batch_size, d_layer]
+        // Stack embeddings into batch tensor [batch_size, d_layer]
         let batch_tensor = Tensor::stack(embeddings, 0);
         Ok(batch_tensor)
     }
@@ -95,10 +95,10 @@ impl LayerEmbeddingManager {
         layer_id: usize,
         new_embedding: Tensor<Backend, 1>,
     ) -> Result<(), ScoutGateError> {
-        // 验证layer_id
+        // Validate layer_id
         self.validate_layer_id(layer_id)?;
         
-        // 验证embedding维度
+        // Validate embedding dimension
         let shape = new_embedding.shape();
         if shape.dims[0] != self.d_layer {
             return Err(ScoutGateError::LayerEmbeddingError {
@@ -106,11 +106,11 @@ impl LayerEmbeddingManager {
             });
         }
         
-        // 更新对应位置的embedding
-        // 将1D embedding扩展为2D [1, d_layer]
+        // Update embedding at corresponding position
+        // Expand 1D embedding to 2D [1, d_layer]
         let expanded = new_embedding.unsqueeze::<2>();
         
-        // 更新layer_embeddings中的对应行
+        // Update corresponding row in layer_embeddings
         let mut updated_embeddings = self.layer_embeddings.clone();
         updated_embeddings = updated_embeddings.slice_assign([layer_id..layer_id+1, 0..self.d_layer], expanded);
         

@@ -14,9 +14,9 @@ use crate::scoutgate::error::ScoutGateError;
 type Backend = NdArray<f32>;
 type Device = NdArrayDevice;
 
-/// Context processor for ScoutGate pipeline
+/// Context processor for ScoutGate context preparation
 ///
-/// Handles concatenation of token and layer embeddings, optional compression,
+/// Handles context concatenation, optional compression,
 /// and normalization to prepare context for two-tower architecture.
 pub struct ContextProcessor {
     /// Device for tensor operations
@@ -76,62 +76,117 @@ impl ContextProcessor {
             context_norm,
         })
     }
-    
-    /// Concatenate token embeddings and layer embedding
+
+    /// Concatenate token embeddings with layer embedding
     ///
-    /// Input: token_embeddings [batch_size, m * d_proj], layer_embedding [batch_size, d_ℓ]
-    /// Output: concatenated_context [batch_size, m * d_proj + d_ℓ]
+    /// Combines processed token embeddings [seq_len, d_proj] with layer embedding [d_layer]
+    /// to create unified context representation [seq_len, d_proj + d_layer]
     pub fn concatenate_context(
         &self,
         token_embeddings: Tensor<Backend, 2>,
         layer_embedding: Tensor<Backend, 2>,
     ) -> Result<Tensor<Backend, 2>, ScoutGateError> {
-        todo!("Implement context concatenation along feature dimension")
+        // Validate input dimensions
+        let token_shape = token_embeddings.shape();
+        let layer_shape = layer_embedding.shape();
+        
+        // token_embeddings: [seq_len, d_proj]
+        // layer_embedding: [1, d_layer] or [seq_len, d_layer]
+        let seq_len = token_shape.dims[0];
+        
+        // If layer_embedding is [1, d_layer], expand to [seq_len, d_layer]
+        let expanded_layer_embedding = if layer_shape.dims[0] == 1 {
+            // Expand layer embedding to match token sequence length
+            layer_embedding.repeat(&[seq_len, layer_shape.dims[1]])
+        } else if layer_shape.dims[0] == seq_len {
+            layer_embedding
+        } else {
+            return Err(ScoutGateError::ContextProcessingError {
+                message: format!(
+                    "Layer embedding batch size {} doesn't match token sequence length {}",
+                    layer_shape.dims[0], seq_len
+                )
+            });
+        };
+        
+        // Concatenate on the last dimension
+        let context = Tensor::cat(vec![token_embeddings, expanded_layer_embedding], 1);
+        
+        Ok(context)
     }
-    
-    /// Apply optional context compression
+
+    /// Apply linear compression to context (optional)
+    ///
+    /// If compression is enabled, applies linear transformation to reduce dimensionality
     pub fn compress_context(
         &self,
         context: Tensor<Backend, 2>,
     ) -> Result<Tensor<Backend, 2>, ScoutGateError> {
-        todo!("Implement optional linear compression to d_h")
+        if let Some(ref compression_layer) = self.context_compression {
+            let compressed = compression_layer.forward(context);
+            Ok(compressed)
+        } else {
+            // No compression, return as is
+            Ok(context)
+        }
     }
-    
+
     /// Apply layer normalization to context
     pub fn normalize_context(
         &self,
         context: Tensor<Backend, 2>,
     ) -> Result<Tensor<Backend, 2>, ScoutGateError> {
-        todo!("Implement layer normalization forward pass")
+        let normalized = self.context_norm.forward(context);
+        Ok(normalized)
     }
-    
+
     /// Complete context processing pipeline
     ///
-    /// Input: token_embeddings [batch_size, m * d_proj], layer_embedding [batch_size, d_ℓ]
-    /// Output: processed_context [batch_size, d_h or m * d_proj + d_ℓ]
+    /// Processes token embeddings and layer embedding through the full pipeline:
+    /// 1. Concatenate token and layer embeddings
+    /// 2. Apply optional compression
+    /// 3. Apply layer normalization
     pub fn process_context(
         &self,
         token_embeddings: Tensor<Backend, 2>,
         layer_embedding: Tensor<Backend, 2>,
     ) -> Result<Tensor<Backend, 2>, ScoutGateError> {
-        todo!("Implement complete context processing pipeline")
+        // Step 1: Concatenate
+        let context = self.concatenate_context(token_embeddings, layer_embedding)?;
+        
+        // Step 2: Optional compression
+        let compressed = self.compress_context(context)?;
+        
+        // Step 3: Normalization
+        let normalized = self.normalize_context(compressed)?;
+        
+        Ok(normalized)
     }
-    
-    /// Get output dimension after processing
-    pub fn output_dimension(&self) -> usize {
-        if self.context_compression.is_some() {
-            self.d_hidden
-        } else {
-            self.context_window_size * self.d_proj + self.d_layer
-        }
-    }
-    
-    /// Validate input dimensions
-    pub fn validate_input_shapes(
+
+    /// Batch process multiple contexts
+    ///
+    /// Process multiple token-layer embedding pairs efficiently
+    pub fn process_context_batch(
         &self,
         token_embeddings: &Tensor<Backend, 2>,
         layer_embedding: &Tensor<Backend, 2>,
-    ) -> Result<(), ScoutGateError> {
-        todo!("Implement input shape validation")
+    ) -> Result<Tensor<Backend, 2>, ScoutGateError> {
+        // For batch processing, delegate to single context processing
+        // In a more optimized implementation, this could be vectorized
+        self.process_context(token_embeddings.clone(), layer_embedding.clone())
+    }
+
+    /// Get expected input dimension for context
+    pub fn get_input_dimension(&self) -> usize {
+        self.context_window_size * self.d_proj + self.d_layer
+    }
+
+    /// Get output dimension after processing
+    pub fn get_output_dimension(&self) -> usize {
+        if self.context_compression.is_some() {
+            self.d_hidden
+        } else {
+            self.get_input_dimension()
+        }
     }
 }

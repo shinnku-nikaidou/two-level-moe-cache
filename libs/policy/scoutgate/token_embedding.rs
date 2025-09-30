@@ -88,8 +88,8 @@ impl TokenEmbeddingProcessor {
     ///
     /// In production, this would interface with the main LLM's embedding layer
     pub fn get_raw_embeddings(&self, _token_ids: &[u32]) -> Result<Tensor<Backend, 2>, ScoutGateError> {
-        // 这里应该从主模型的embedding层获取embeddings
-        // 目前使用随机初始化作为占位符，实际应该调用主模型的embedding layer
+        // This should get embeddings from the main model's embedding layer
+        // Currently using random initialization as placeholder, should call main model's embedding layer in production
         let batch_size = _token_ids.len();
         let embeddings = Tensor::random([batch_size, self.d_emb], burn::tensor::Distribution::Normal(0.0, 1.0), &self.device);
         
@@ -98,14 +98,14 @@ impl TokenEmbeddingProcessor {
     
     /// Project token embeddings: d_emb -> d_proj
     pub fn project_embeddings(&self, embeddings: Tensor<Backend, 2>) -> Result<Tensor<Backend, 2>, ScoutGateError> {
-        // 应用线性投影层
+        // Apply linear projection layer
         let projected = self.projection_layer.forward(embeddings);
         Ok(projected)
     }
     
     /// Apply Layer Normalization to embeddings
     pub fn normalize_embeddings(&self, embeddings: Tensor<Backend, 2>) -> Result<Tensor<Backend, 2>, ScoutGateError> {
-        // 应用层归一化
+        // Apply layer normalization
         let normalized = self.layer_norm.forward(embeddings);
         Ok(normalized)
     }
@@ -114,18 +114,18 @@ impl TokenEmbeddingProcessor {
     ///
     /// Returns projected and normalized embeddings for all tokens in context
     pub fn process_context(&self) -> Result<Tensor<Backend, 2>, ScoutGateError> {
-        // 如果context为空，返回错误
+        // Return error if context is empty
         if self.token_context.is_empty() {
             return Err(ScoutGateError::TokenEmbeddingError { message: "Context window is empty".to_string() });
         }
         
-        // 获取原始embeddings
+        // Get raw embeddings
         let raw_embeddings = self.get_raw_embeddings(&self.token_context)?;
         
-        // 应用投影
+        // Apply projection
         let projected = self.project_embeddings(raw_embeddings)?;
         
-        // 应用层归一化
+        // Apply layer normalization
         let normalized = self.normalize_embeddings(projected)?;
         
         Ok(normalized)
