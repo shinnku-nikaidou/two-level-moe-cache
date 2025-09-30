@@ -20,7 +20,7 @@ use tracing::{debug, info, instrument};
 ///
 /// This is the CORRECT architecture implementation:
 /// Core layer is ONLY a Python interface - all business logic in policy layer
-#[pyclass]
+#[pyclass(unsendable)]
 pub struct RustTwoTierWmExpertCacheManager {
     /// Timer for time step management
     pub(crate) timer: Arc<RwLock<Timer>>,
@@ -100,7 +100,8 @@ impl RustTwoTierWmExpertCacheManager {
         debug!("EWMA predictor initialized");
 
         // Create ScoutGate predictor with shared timer reference
-        let scoutgate = ScoutGatePredictor::from_model(timer.clone(), model_type);
+        let scoutgate = ScoutGatePredictor::from_model(timer.clone(), model_type)
+            .map_err(|e| format!("Failed to create ScoutGate predictor: {:?}", e))?;
         debug!("ScoutGate predictor initialized");
 
         // Create probability fusion with shared timer reference
