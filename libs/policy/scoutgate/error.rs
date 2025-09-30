@@ -25,6 +25,27 @@ pub enum ScoutGateError {
 
     /// Resource allocation errors (memory, GPU, etc.)
     ResourceError { message: String },
+    
+    /// Token embedding processing errors
+    TokenEmbeddingError { message: String },
+    
+    /// Layer embedding management errors
+    LayerEmbeddingError { message: String },
+    
+    /// Context processing pipeline errors
+    ContextProcessingError { message: String },
+    
+    /// Expert embedding store errors
+    ExpertEmbeddingError { message: String },
+    
+    /// Two-tower scoring errors
+    TwoTowerError { message: String },
+    
+    /// Tensor shape or dimension mismatch errors
+    DimensionError { expected: String, actual: String },
+    
+    /// Index out of bounds errors
+    IndexError { index: usize, max: usize },
 }
 
 impl fmt::Display for ScoutGateError {
@@ -47,6 +68,27 @@ impl fmt::Display for ScoutGateError {
             }
             ScoutGateError::ResourceError { message } => {
                 write!(f, "ScoutGate resource error: {}", message)
+            }
+            ScoutGateError::TokenEmbeddingError { message } => {
+                write!(f, "ScoutGate token embedding error: {}", message)
+            }
+            ScoutGateError::LayerEmbeddingError { message } => {
+                write!(f, "ScoutGate layer embedding error: {}", message)
+            }
+            ScoutGateError::ContextProcessingError { message } => {
+                write!(f, "ScoutGate context processing error: {}", message)
+            }
+            ScoutGateError::ExpertEmbeddingError { message } => {
+                write!(f, "ScoutGate expert embedding error: {}", message)
+            }
+            ScoutGateError::TwoTowerError { message } => {
+                write!(f, "ScoutGate two-tower error: {}", message)
+            }
+            ScoutGateError::DimensionError { expected, actual } => {
+                write!(f, "ScoutGate dimension error: expected {}, got {}", expected, actual)
+            }
+            ScoutGateError::IndexError { index, max } => {
+                write!(f, "ScoutGate index error: index {} out of bounds (max {})", index, max)
             }
         }
     }
