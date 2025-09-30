@@ -4,8 +4,8 @@
 //! for different Transformer layers. Each layer has its own embedding vector
 //! z_ℓ ∈ R^{d_ℓ} to distinguish layer-specific expert activation patterns.
 
+use burn::tensor::{Shape, Tensor};
 use burn_ndarray::{NdArray, NdArrayDevice};
-use burn::tensor::{Tensor, Shape};
 
 use crate::constants::ModelConfig;
 use crate::scoutgate::error::ScoutGateError;
@@ -21,13 +21,13 @@ type Device = NdArrayDevice;
 pub struct LayerEmbeddingManager {
     /// Device for tensor operations
     device: Device,
-    
+
     /// Model configuration
     model_config: ModelConfig,
-    
+
     /// Embedding dimension for each layer
     d_layer: usize,
-    
+
     /// Layer embeddings: [total_layers, d_layer]
     layer_embeddings: Tensor<Backend, 2>,
 }
@@ -55,35 +55,44 @@ impl LayerEmbeddingManager {
     }
 
     /// Get layer embedding for specific layer
-    pub fn get_layer_embedding(&self, layer_id: usize) -> Result<Tensor<Backend, 1>, ScoutGateError> {
+    pub fn get_layer_embedding(
+        &self,
+        layer_id: usize,
+    ) -> Result<Tensor<Backend, 1>, ScoutGateError> {
         // Validate layer_id
         self.validate_layer_id(layer_id)?;
-        
+
         // Extract corresponding layer embedding from tensor
         // layer_embeddings: [total_layers, d_layer]
         // We need to take the layer_id-th row
-        let embedding = self.layer_embeddings.clone().slice([layer_id..layer_id+1, 0..self.d_layer]);
-        
+        let embedding = self
+            .layer_embeddings
+            .clone()
+            .slice([layer_id..layer_id + 1, 0..self.d_layer]);
+
         // Squeeze 2D [1, d_layer] to 1D [d_layer]
         let embedding_1d = embedding.squeeze::<1>(0);
-        
+
         Ok(embedding_1d)
     }
 
     /// Get batch of layer embeddings
-    pub fn get_layer_embeddings_batch(&self, layer_ids: &[usize]) -> Result<Tensor<Backend, 2>, ScoutGateError> {
+    pub fn get_layer_embeddings_batch(
+        &self,
+        layer_ids: &[usize],
+    ) -> Result<Tensor<Backend, 2>, ScoutGateError> {
         // Validate all layer_ids
         for &layer_id in layer_ids {
             self.validate_layer_id(layer_id)?;
         }
-        
-        // Collect all embeddings  
+
+        // Collect all embeddings
         let mut embeddings = Vec::new();
         for &layer_id in layer_ids {
             let embedding = self.get_layer_embedding(layer_id)?;
             embeddings.push(embedding);
         }
-        
+
         // Stack embeddings into batch tensor [batch_size, d_layer]
         let batch_tensor = Tensor::stack(embeddings, 0);
         Ok(batch_tensor)
@@ -97,23 +106,27 @@ impl LayerEmbeddingManager {
     ) -> Result<(), ScoutGateError> {
         // Validate layer_id
         self.validate_layer_id(layer_id)?;
-        
+
         // Validate embedding dimension
         let shape = new_embedding.shape();
         if shape.dims[0] != self.d_layer {
             return Err(ScoutGateError::LayerEmbeddingError {
-                message: format!("Expected embedding dimension {}, got {}", self.d_layer, shape.dims[0])
+                message: format!(
+                    "Expected embedding dimension {}, got {}",
+                    self.d_layer, shape.dims[0]
+                ),
             });
         }
-        
+
         // Update embedding at corresponding position
         // Expand 1D embedding to 2D [1, d_layer]
         let expanded = new_embedding.unsqueeze::<2>();
-        
+
         // Update corresponding row in layer_embeddings
         let mut updated_embeddings = self.layer_embeddings.clone();
-        updated_embeddings = updated_embeddings.slice_assign([layer_id..layer_id+1, 0..self.d_layer], expanded);
-        
+        updated_embeddings =
+            updated_embeddings.slice_assign([layer_id..layer_id + 1, 0..self.d_layer], expanded);
+
         self.layer_embeddings = updated_embeddings;
         Ok(())
     }
@@ -122,7 +135,10 @@ impl LayerEmbeddingManager {
     pub fn validate_layer_id(&self, layer_id: usize) -> Result<(), ScoutGateError> {
         if layer_id >= self.model_config.total_layers {
             return Err(ScoutGateError::LayerEmbeddingError {
-                message: format!("Layer ID {} exceeds total layers {}", layer_id, self.model_config.total_layers)
+                message: format!(
+                    "Layer ID {} exceeds total layers {}",
+                    layer_id, self.model_config.total_layers
+                ),
             });
         }
         Ok(())

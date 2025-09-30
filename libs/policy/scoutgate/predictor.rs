@@ -9,8 +9,8 @@
 //! - Two-tower scoring architecture
 //! - Integration with Timer and ExpertProbability systems
 
-use burn_ndarray::{NdArray, NdArrayDevice};
 use burn::tensor::Tensor;
+use burn_ndarray::{NdArray, NdArrayDevice};
 
 use crate::ExpertProbability;
 use crate::constants::{ModelConfig, ModelType};
@@ -18,11 +18,11 @@ use crate::timer::Timer;
 use std::sync::{Arc, RwLock};
 
 use super::config::ScoutGateConfig;
-use super::error::ScoutGateError;
-use super::token_embedding::TokenEmbeddingProcessor;
-use super::layer_embedding::LayerEmbeddingManager;
 use super::context_processing::ContextProcessor;
+use super::error::ScoutGateError;
 use super::expert_embedding::ExpertEmbeddingStore;
+use super::layer_embedding::LayerEmbeddingManager;
+use super::token_embedding::TokenEmbeddingProcessor;
 use super::two_tower::TwoTowerScorer;
 
 type Backend = NdArray<f32>;
@@ -46,7 +46,7 @@ pub struct ScoutGatePredictor {
 
     /// Model configuration (layers, experts per layer, etc.)
     model_config: ModelConfig,
-    
+
     /// Device for tensor operations
     device: Device,
 
@@ -55,16 +55,16 @@ pub struct ScoutGatePredictor {
 
     /// Token embedding processor
     token_processor: TokenEmbeddingProcessor,
-    
+
     /// Layer embedding manager
     layer_manager: LayerEmbeddingManager,
-    
+
     /// Context processing pipeline
     context_processor: ContextProcessor,
-    
+
     /// Expert embedding store
     expert_store: ExpertEmbeddingStore,
-    
+
     /// Two-tower scorer
     two_tower_scorer: TwoTowerScorer,
 }
@@ -92,13 +92,10 @@ impl ScoutGatePredictor {
             config.context_window_size,
             device,
         )?;
-        
-        let layer_manager = LayerEmbeddingManager::new(
-            model_config.clone(),
-            config.layer_embedding_dim,
-            device,
-        )?;
-        
+
+        let layer_manager =
+            LayerEmbeddingManager::new(model_config.clone(), config.layer_embedding_dim, device)?;
+
         let context_processor = ContextProcessor::new(
             config.projection_dim,
             config.layer_embedding_dim,
@@ -107,19 +104,15 @@ impl ScoutGatePredictor {
             true, // use compression
             device,
         )?;
-        
+
         let expert_store = ExpertEmbeddingStore::new(
             model_config.clone(),
             config.expert_embedding_dim,
             config.low_rank_dim,
             device,
         )?;
-        
-        let two_tower_scorer = TwoTowerScorer::new(
-            config.hidden_dim,
-            config.low_rank_dim,
-            device,
-        )?;
+
+        let two_tower_scorer = TwoTowerScorer::new(config.hidden_dim, config.low_rank_dim, device)?;
 
         Ok(ScoutGatePredictor {
             timer,
@@ -143,7 +136,10 @@ impl ScoutGatePredictor {
     }
 
     /// Create ScoutGate predictor from model type
-    pub fn from_model(timer: Arc<RwLock<Timer>>, model_type: ModelType) -> Result<Self, ScoutGateError> {
+    pub fn from_model(
+        timer: Arc<RwLock<Timer>>,
+        model_type: ModelType,
+    ) -> Result<Self, ScoutGateError> {
         let model_config: ModelConfig = model_type.into();
         Self::new(timer, model_config, ScoutGateConfig::default())
     }
@@ -165,7 +161,7 @@ impl ScoutGatePredictor {
     pub fn update_token_context(&mut self, new_token: u32) -> Result<(), ScoutGateError> {
         // Add token to the token embedding processor
         self.token_processor.add_token(new_token)?;
-        
+
         // Trigger prediction update with new context
         self.update_predictions()?;
 
@@ -183,35 +179,34 @@ impl ScoutGatePredictor {
     pub fn predict_all_layers(&mut self) -> Result<(), ScoutGateError> {
         // Step 1: Process token context (using the method without arguments)
         let token_context = self.token_processor.process_context()?;
-        
+
         // Step 2: Process all layers simultaneously
         for layer_id in 0..self.model_config.total_layers {
             // Get layer embedding (returns Tensor<Backend, 1>)
             let layer_embedding = self.layer_manager.get_layer_embedding(layer_id)?;
-            
+
             // Convert 1D layer embedding to 2D for context processing
             let layer_embedding_2d = layer_embedding.unsqueeze::<2>();
-            
+
             // Process context (concatenate token and layer embeddings)
-            let processed_context = self.context_processor.process_context(
-                token_context.clone(),
-                layer_embedding_2d,
-            )?;
-            
+            let processed_context = self
+                .context_processor
+                .process_context(token_context.clone(), layer_embedding_2d)?;
+
             // Get expert embeddings matrix for this layer
             let expert_matrix = self.expert_store.get_precomputed_matrix(layer_id)?;
-            
+
             // Score experts using two-tower architecture
             let scores = self.two_tower_scorer.score_experts(
                 processed_context,
                 expert_matrix.clone(),
                 layer_id,
             )?;
-            
+
             // Extract scores and update predictions matrix
             let scores_data = scores.to_data();
             let scores_vec: Vec<f32> = scores_data.to_vec().unwrap();
-            
+
             // Update predictions for this layer (using the correct method name)
             for (expert_id, &score) in scores_vec.iter().enumerate() {
                 if expert_id < self.model_config.experts_per_layer {
@@ -219,7 +214,7 @@ impl ScoutGatePredictor {
                 }
             }
         }
-        
+
         Ok(())
     }
 
@@ -227,39 +222,42 @@ impl ScoutGatePredictor {
     pub fn predict_layer(&mut self, layer_id: usize) -> Result<Vec<f64>, ScoutGateError> {
         // Validate layer ID
         if layer_id >= self.model_config.total_layers {
-            return Err(ScoutGateError::LayerEmbeddingError { 
-                message: format!("Layer ID {} out of bounds (max: {})", layer_id, self.model_config.total_layers - 1) 
+            return Err(ScoutGateError::LayerEmbeddingError {
+                message: format!(
+                    "Layer ID {} out of bounds (max: {})",
+                    layer_id,
+                    self.model_config.total_layers - 1
+                ),
             });
         }
-        
+
         // Step 1: Process token context
         let token_context = self.token_processor.process_context()?;
-        
+
         // Step 2: Get layer embedding
         let layer_embedding = self.layer_manager.get_layer_embedding(layer_id)?;
         let layer_embedding_2d = layer_embedding.unsqueeze::<2>();
-        
+
         // Step 3: Process context
-        let processed_context = self.context_processor.process_context(
-            token_context,
-            layer_embedding_2d,
-        )?;
-        
+        let processed_context = self
+            .context_processor
+            .process_context(token_context, layer_embedding_2d)?;
+
         // Step 4: Get expert embeddings matrix
         let expert_matrix = self.expert_store.get_precomputed_matrix(layer_id)?;
-        
+
         // Step 5: Score experts
         let scores = self.two_tower_scorer.score_experts(
             processed_context,
             expert_matrix.clone(),
             layer_id,
         )?;
-        
+
         // Step 6: Extract and return scores
         let scores_data = scores.to_data();
         let scores_vec: Vec<f32> = scores_data.to_vec().unwrap();
         let result: Vec<f64> = scores_vec.iter().map(|&x| x as f64).collect();
-        
+
         Ok(result)
     }
 

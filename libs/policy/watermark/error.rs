@@ -15,8 +15,8 @@ pub enum WatermarkError {
     /// Capacity constraint violation
     CapacityViolation {
         tier: String,
-        required: f64,    // Changed to f64 for MB units
-        available: f64,   // Changed to f64 for MB units
+        required: f64,  // Changed to f64 for MB units
+        available: f64, // Changed to f64 for MB units
     },
 
     /// Expert not found in tracking state

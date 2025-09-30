@@ -51,10 +51,10 @@ pub mod hyperparamater;
 pub mod predictor;
 
 // ScoutGate component modules
-pub mod token_embedding;
-pub mod layer_embedding;
 pub mod context_processing;
 pub mod expert_embedding;
+pub mod layer_embedding;
+pub mod token_embedding;
 pub mod two_tower;
 
 // Re-export main types for easier access

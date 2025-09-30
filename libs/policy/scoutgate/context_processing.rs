@@ -5,9 +5,9 @@
 //! - Optional linear compression to hidden dimension d_h
 //! - Layer normalization for stable processing
 
+use burn::nn::{LayerNormConfig, LinearConfig};
+use burn::tensor::{Shape, Tensor};
 use burn_ndarray::{NdArray, NdArrayDevice};
-use burn::nn::{LinearConfig, LayerNormConfig};
-use burn::tensor::{Tensor, Shape};
 
 use crate::scoutgate::error::ScoutGateError;
 
@@ -21,22 +21,22 @@ type Device = NdArrayDevice;
 pub struct ContextProcessor {
     /// Device for tensor operations
     device: Device,
-    
+
     /// Token projection dimension (d_proj = 128)
     d_proj: usize,
-    
+
     /// Layer embedding dimension (d_ℓ)
     d_layer: usize,
-    
+
     /// Context window size (m = 8)
     context_window_size: usize,
-    
+
     /// Hidden dimension (d_h = 256)
     d_hidden: usize,
-    
+
     /// Optional context compression layer: (m * d_proj + d_ℓ) -> d_h
     context_compression: Option<burn::nn::Linear<Backend>>,
-    
+
     /// Layer normalization for context
     context_norm: burn::nn::LayerNorm<Backend>,
 }
@@ -51,8 +51,10 @@ impl ContextProcessor {
         use_compression: bool,
         device: Device,
     ) -> Result<Self, ScoutGateError> {
-        let input_dim = d_proj + d_layer;
-        
+        // According to paper: context dimension is m * d_proj + d_layer
+        // where m is context window size (number of recent tokens)
+        let input_dim = context_window_size * d_proj + d_layer;
+
         // Optional compression layer
         let context_compression = if use_compression {
             let compression_config = LinearConfig::new(input_dim, d_hidden);
@@ -60,12 +62,12 @@ impl ContextProcessor {
         } else {
             None
         };
-        
+
         // Context normalization (on final dimension)
         let norm_dim = if use_compression { d_hidden } else { input_dim };
         let context_norm_config = LayerNormConfig::new(norm_dim);
         let context_norm = context_norm_config.init(&device);
-        
+
         Ok(Self {
             device,
             d_proj,
@@ -79,8 +81,8 @@ impl ContextProcessor {
 
     /// Concatenate token embeddings with layer embedding
     ///
-    /// Combines processed token embeddings [seq_len, d_proj] with layer embedding [d_layer]
-    /// to create unified context representation [seq_len, d_proj + d_layer]
+    /// According to paper: flattens token embeddings [m, d_proj] to [m * d_proj]
+    /// then concatenates with layer embedding [d_layer] to get [m * d_proj + d_layer]
     pub fn concatenate_context(
         &self,
         token_embeddings: Tensor<Backend, 2>,
@@ -89,29 +91,41 @@ impl ContextProcessor {
         // Validate input dimensions
         let token_shape = token_embeddings.shape();
         let layer_shape = layer_embedding.shape();
-        
-        // token_embeddings: [seq_len, d_proj]
-        // layer_embedding: [1, d_layer] or [seq_len, d_layer]
+
+        // token_embeddings: [seq_len, d_proj] where seq_len <= context_window_size
+        // layer_embedding: [1, d_layer]
         let seq_len = token_shape.dims[0];
-        
-        // If layer_embedding is [1, d_layer], expand to [seq_len, d_layer]
-        let expanded_layer_embedding = if layer_shape.dims[0] == 1 {
-            // Expand layer embedding to match token sequence length
-            layer_embedding.repeat(&[seq_len, layer_shape.dims[1]])
-        } else if layer_shape.dims[0] == seq_len {
+        let d_proj = token_shape.dims[1];
+
+        // Pad token embeddings to full context window size if needed
+        let padded_tokens = if seq_len < self.context_window_size {
+            let padding_size = self.context_window_size - seq_len;
+            let padding = Tensor::zeros([padding_size, d_proj], &self.device);
+            Tensor::cat(vec![token_embeddings, padding], 0)
+        } else {
+            // If we have more tokens than window size, take the last context_window_size tokens
+            let start_idx = seq_len.saturating_sub(self.context_window_size);
+            token_embeddings.slice([start_idx..start_idx + self.context_window_size, 0..d_proj])
+        };
+
+        // Flatten token embeddings: [context_window_size, d_proj] -> [1, context_window_size * d_proj]
+        let flattened_tokens = padded_tokens.reshape([1, self.context_window_size * d_proj]);
+
+        // Ensure layer embedding is [1, d_layer]
+        let layer_emb_1d = if layer_shape.dims[0] == 1 {
             layer_embedding
         } else {
             return Err(ScoutGateError::ContextProcessingError {
                 message: format!(
-                    "Layer embedding batch size {} doesn't match token sequence length {}",
-                    layer_shape.dims[0], seq_len
-                )
+                    "Layer embedding should be [1, d_layer], got [{}, {}]",
+                    layer_shape.dims[0], layer_shape.dims[1]
+                ),
             });
         };
-        
-        // Concatenate on the last dimension
-        let context = Tensor::cat(vec![token_embeddings, expanded_layer_embedding], 1);
-        
+
+        // Concatenate: [1, m * d_proj] + [1, d_layer] -> [1, m * d_proj + d_layer]
+        let context = Tensor::cat(vec![flattened_tokens, layer_emb_1d], 1);
+
         Ok(context)
     }
 
@@ -153,13 +167,13 @@ impl ContextProcessor {
     ) -> Result<Tensor<Backend, 2>, ScoutGateError> {
         // Step 1: Concatenate
         let context = self.concatenate_context(token_embeddings, layer_embedding)?;
-        
+
         // Step 2: Optional compression
         let compressed = self.compress_context(context)?;
-        
+
         // Step 3: Normalization
         let normalized = self.normalize_context(compressed)?;
-        
+
         Ok(normalized)
     }
 

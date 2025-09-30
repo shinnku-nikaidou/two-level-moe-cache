@@ -336,9 +336,9 @@ impl WatermarkAlgorithm {
     pub fn from_model(model_type: ModelType, vram_capacity: f64, ram_capacity: f64) -> Self {
         // Model-specific learning rate tuning based on empirical results
         let (vram_lr, ram_lr) = match model_type {
-            ModelType::GptOss20B => (0.00001, 0.00001),    // Very conservative adaptation
+            ModelType::GptOss20B => (0.00001, 0.00001), // Very conservative adaptation
             ModelType::GptOss120B => (0.000005, 0.000005), // Even slower for stability
-            ModelType::PhiTinyMoe => (0.00001, 0.00001),   // Conservative for small model
+            ModelType::PhiTinyMoe => (0.00001, 0.00001), // Conservative for small model
         };
 
         // Expert sizes measured from actual model checkpoints (MB)
